@@ -33,6 +33,13 @@
   .cell .v{font-size:16px;font-weight:700;letter-spacing:-0.5px;}
   .cell .v u{font-size:10px;color:#8aa0ba;text-decoration:none;font-weight:600;}
   #state{margin-top:10px;padding:7px 10px;border-radius:9px;font-size:12px;font-weight:700;text-align:center;}
+  .totrow{display:flex;justify-content:space-between;align-items:baseline;font-size:11.5px;color:#9fb0c6;margin:5px 0;}
+  .totrow b{color:#7fe07a;font-weight:800;font-variant-numeric:tabular-nums;}
+  .totrow.big2{margin-bottom:9px;} .totrow.big2 b{font-size:20px;}
+  #scenario{display:none;top:54px;left:50%;transform:translateX(-50%);max-width:80vw;text-align:center;
+    background:rgba(166,4,55,0.92);color:#fff;padding:9px 22px;border-radius:11px;font-size:16px;font-weight:800;
+    border:1px solid rgba(255,255,255,0.35);box-shadow:0 6px 24px rgba(0,0,0,0.4);letter-spacing:-0.2px;}
+  #scenario small{display:block;font-size:11.5px;font-weight:600;opacity:0.9;margin-top:2px;}
 
   #panel{bottom:14px;left:16px;width:312px;background:var(--panel);
     border:1px solid var(--line);border-radius:14px;padding:14px;backdrop-filter:blur(8px);
@@ -137,18 +144,19 @@
   <button id="bFull">⛶ 전체화면</button>
   <button id="bPlay">⏸ 일시정지</button>
 </div>
+<div class="hud" id="scenario"></div>
 
 <div class="hud" id="metrics">
   <div class="big">현재 발전 출력</div>
   <div id="power">0<small> MW</small></div>
   <div class="bar"><span id="powerbar"></span></div>
+  <div class="totrow"><span>⏱ 경과 시간</span><b id="elapsed">0일 00시간</b></div>
+  <div class="totrow big2"><span>Σ 총 누적 발전</span><b id="totMWh">0 MWh</b></div>
   <div class="grid2">
     <div class="cell"><div class="k">바다 수위</div><div class="v"><span id="seaLv">0.0</span><u> m</u></div></div>
     <div class="cell"><div class="k">호소 수위</div><div class="v"><span id="lakeLv">0.0</span><u> m</u></div></div>
     <div class="cell"><div class="k">낙차(Head)</div><div class="v"><span id="head">0.0</span><u> m</u></div></div>
     <div class="cell"><div class="k">가동 터빈</div><div class="v"><span id="nturb">10</span><u> / 10기</u></div></div>
-    <div class="cell"><div class="k">이번 주기</div><div class="v"><span id="energy">0.0</span><u> MWh</u></div></div>
-    <div class="cell"><div class="k">경과 시간</div><div class="v"><span id="clock">00:00</span></div></div>
   </div>
   <div id="state">대기</div>
 </div>
@@ -252,7 +260,7 @@ const gateFlow = r => r<=0?0:Math.min(700*Math.sqrt(r),1400);          // 1문 �
 
 function freshState(){
   return { t:0, sea:PLANT.meanSea, lake:PLANT.meanSea-3.0,
-           state:'WAIT', prev:'WAIT', power:0, cycE:0, lastCycle:0 };
+           state:'WAIT', prev:'WAIT', power:0, cycE:0, lastCycle:0, totalMWh:0 };
 }
 // s를 dtHr만큼 전진. 완료된 주기 발전량(MWh) 반환(없으면 0)
 function integrate(s, p, dtHr){
@@ -278,6 +286,7 @@ function integrate(s, p, dtHr){
     qIn = turbFlow(head)*p.nTurb;
     s.cycE += s.power*dtHr;
   }
+  s.totalMWh += s.power*dtHr;
   let qOut=0;
   if(s.state==='SLUICE' && rev>0) qOut = gateFlow(rev)*p.nGate;
 
@@ -924,9 +933,10 @@ function updateHUD(){
   $('lakeLv').textContent=sim.lake.toFixed(2);
   $('head').textContent=head.toFixed(2);
   $('nturb').textContent=(sim.state==='GEN'?P.nTurb:0);
-  $('energy').textContent=sim.cycE.toFixed(1);
-  const hh=Math.floor(sim.t%24), mm=Math.floor((sim.t*60)%60);
-  $('clock').textContent=String(hh).padStart(2,'0')+':'+String(mm).padStart(2,'0');
+  const days=Math.floor(sim.t/24), hrs=Math.floor(sim.t%24), mm=Math.floor((sim.t*60)%60);
+  $('elapsed').textContent=`${days}일 ${String(hrs).padStart(2,'0')}시간 ${String(mm).padStart(2,'0')}분`;
+  $('totMWh').textContent=sim.totalMWh>=1000
+    ? (sim.totalMWh/1000).toFixed(2)+' GWh' : Math.round(sim.totalMWh).toLocaleString()+' MWh';
   const s=stateInfo[sim.state]||stateInfo.WAIT;
   $('state').textContent=s.t; $('state').style.background=s.c;
   const cyc=sim.lastCycle;
@@ -939,13 +949,20 @@ addEventListener('resize',()=>{ camera.aspect=innerWidth/innerHeight; camera.upd
 
 $('loading').style.display='none';
 if(REC){
-  // 헤드리스 녹화 API: 외부에서 프레임을 결정론적으로 진행시키고 JPEG로 캡처
+  // 헤드리스 녹화 API: 외부에서 프레임을 결정론적으로 진행 (HUD는 page.screenshot으로 캡처)
+  $('topbtns').style.display='none';                       // 네비 버튼 숨김
+  document.querySelector('.legend').style.display='none';
   let rt0=0;
   window.__rec={ ready:true,
-    frame:(dt)=>{ rt0+=dt; frame(rt0,dt); return renderer.domElement.toDataURL('image/jpeg',0.92); },
+    frame:(dt)=>{ rt0+=dt; frame(rt0,dt); },
     setSpeed:s=>{ rt.speed=s; }, setPlaying:b=>{ rt.playing=b; },
     mode:m=>setMode(m), night:b=>setNight(b), tour:b=>setTour(b),
-    view:i=>{ if(tour) setTour(false); camIdx=i%camViews.length; applyView(camIdx,true); } };
+    view:i=>{ if(tour) setTour(false); camIdx=i%camViews.length; applyView(camIdx,true); },
+    cfg:sh=>{ setMode('manual'); slStart.set(sh.toFixed(1)); },   // 수동 개시낙차 설정(워스트용)
+    reset:()=>{ sim=freshState(); rt0=0; },
+    reflector:b=>{ lakeReflector.visible=b; },
+    scenario:(title,sub)=>{ const e=$('scenario'); if(!title){ e.style.display='none'; return; }
+      e.innerHTML=title+(sub?('<small>'+sub+'</small>'):''); e.style.display='block'; } };
 } else {
   requestAnimationFrame(tick);
 }
