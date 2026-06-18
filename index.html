@@ -481,14 +481,26 @@ for(let i=0;i<PLANT.nTurbines;i++){
     const arm=new THREE.Group(); arm.add(blade); arm.rotation.x=b*Math.PI/2; runner.add(arm);
   }
   runner.rotation.x=Math.PI/2; runner.position.set(x,1.0,BZ-2); barrier.add(runner);
-  // 통수 입자
-  const N=26, fp=new THREE.BufferGeometry(), pos=new Float32Array(N*3), seed=new Float32Array(N);
+  // 흡입구 노출 회전 팬(잘 보이는 벌브 프로펠러) + 발광 림
+  const fan=new THREE.Group();
+  const nose=new THREE.Mesh(new THREE.ConeGeometry(0.7,1.6,16),matSteel); nose.rotation.x=-Math.PI/2; nose.position.z=-0.8; fan.add(nose);
+  for(let b=0;b<5;b++){
+    const blade=new THREE.Mesh(new THREE.BoxGeometry(0.14,2.1,0.8),bladeMat);
+    blade.position.y=1.2; blade.rotation.z=0.6;
+    const arm=new THREE.Group(); arm.add(blade); arm.rotation.z=b*(TWO_PI/5); fan.add(arm);
+  }
+  fan.position.set(x,1.0,BZ-(BARRIER_W+5)/2+0.9); barrier.add(fan);
+  const glow=new THREE.Mesh(new THREE.TorusGeometry(2.45,0.18,8,24),
+    new THREE.MeshStandardMaterial({color:0xffd34d,emissive:0xffb020,emissiveIntensity:0,transparent:true,opacity:0.9}));
+  glow.position.set(x,1.0,BZ-(BARRIER_W+5)/2+0.2); barrier.add(glow);
+  // 통수 입자(유량 비례, 가산 블렌딩)
+  const N=44, fp=new THREE.BufferGeometry(), pos=new Float32Array(N*3), seed=new Float32Array(N);
   for(let k=0;k<N;k++){ seed[k]=Math.random();
-    pos[k*3]=x+(Math.random()-0.5)*2.6; pos[k*3+1]=1.0+(Math.random()-0.5)*2.6; pos[k*3+2]=BZ; }
+    pos[k*3]=x+(Math.random()-0.5)*3.0; pos[k*3+1]=1.0+(Math.random()-0.5)*3.0; pos[k*3+2]=(Math.random()-0.5)*BARRIER_W; }
   fp.setAttribute('position',new THREE.BufferAttribute(pos,3)); fp.userData={seed,x};
-  const flow=new THREE.Points(fp,new THREE.PointsMaterial({color:0xffd34d,size:0.7,transparent:true,opacity:0}));
+  const flow=new THREE.Points(fp,new THREE.PointsMaterial({color:0xffe07a,size:0.8,transparent:true,opacity:0,depthWrite:false,blending:THREE.AdditiveBlending}));
   barrier.add(flow);
-  turbines.push({runner,flow,x,on:true});
+  turbines.push({runner,fan,glow,flow,x,on:true});
 }
 
 // --------- 수문부(슬루스 게이트) 8문 ---------
@@ -505,12 +517,12 @@ for(let i=0;i<PLANT.nGates;i++){
   // 권양 트러스 + 모터
   box(gateWidth*0.9,7,0.6,matSteel,x,deckY+4.5,BZ-BARRIER_W/2+1.5);
   box(2.4,1.6,2.4,matYellow,x,deckY+8,BZ-BARRIER_W/2+1.5);
-  // 배수 입자
-  const N=22, fp=new THREE.BufferGeometry(), pos=new Float32Array(N*3), seed=new Float32Array(N);
+  // 배수 입자(가산 블렌딩)
+  const N=40, fp=new THREE.BufferGeometry(), pos=new Float32Array(N*3), seed=new Float32Array(N);
   for(let k=0;k<N;k++){ seed[k]=Math.random();
-    pos[k*3]=x+(Math.random()-0.5)*gateWidth; pos[k*3+1]=-1.5+(Math.random()-0.5)*2; pos[k*3+2]=BZ; }
+    pos[k*3]=x+(Math.random()-0.5)*gateWidth; pos[k*3+1]=-1.5+(Math.random()-0.5)*2.5; pos[k*3+2]=(Math.random()-0.5)*BARRIER_W; }
   fp.setAttribute('position',new THREE.BufferAttribute(pos,3)); fp.userData={seed,x};
-  const flow=new THREE.Points(fp,new THREE.PointsMaterial({color:0xbfe6ff,size:0.65,transparent:true,opacity:0}));
+  const flow=new THREE.Points(fp,new THREE.PointsMaterial({color:0xcdeeff,size:0.8,transparent:true,opacity:0,depthWrite:false,blending:THREE.AdditiveBlending}));
   barrier.add(flow);
   // 마지막 피어(우단)
   if(i===PLANT.nGates-1) box(GATE_PITCH-gateWidth,deckY+8,BARRIER_W+1,matConcrete,gateX0+GATE_PITCH*(i+1),(deckY+8)/2-3,BZ);
@@ -600,6 +612,66 @@ scene.add(sea,lake);
 const seaBase=sea.geometry.attributes.position.array.slice();
 const lakeBase=lake.geometry.attributes.position.array.slice();
 landStrip(-(820+BARRIER_W/2)-6,0x7d7152); landStrip(+(820+BARRIER_W/2)+6,0x6f7d4a);
+
+// ============ 화려한 가시화: 물보라/포말 · 수위 게이지 · 실시간 라벨 ============
+function makeSpray(color,size){
+  const N=220, g=new THREE.BufferGeometry();
+  const pos=new Float32Array(N*3).fill(-999), vel=new Float32Array(N*3), life=new Float32Array(N).fill(-1);
+  g.setAttribute('position',new THREE.BufferAttribute(pos,3)); g.userData={vel,life};
+  const p=new THREE.Points(g,new THREE.PointsMaterial({color,size,transparent:true,opacity:0.92,depthWrite:false,blending:THREE.AdditiveBlending}));
+  p.frustumCulled=false; scene.add(p); return p;
+}
+const sprayGen=makeSpray(0xdff3ff,0.95);    // 발전 유입 포말(호소측)
+const spraySluice=makeSpray(0xffffff,1.05);  // 배수 물보라(바다측)
+function updateSpray(sys,dt,e){
+  const pos=sys.geometry.attributes.position.array, {vel,life}=sys.geometry.userData, N=life.length;
+  let emit=e.rate;
+  for(let i=0;i<N;i++){
+    if(life[i]>0){
+      life[i]-=dt; vel[i*3+1]-=9.8*dt*0.5;
+      pos[i*3]+=vel[i*3]*dt; pos[i*3+1]+=vel[i*3+1]*dt; pos[i*3+2]+=vel[i*3+2]*dt;
+      if(life[i]<=0||pos[i*3+1]<-2) pos[i*3+1]=-999;
+    } else if(emit>0){
+      emit-=1; life[i]=e.ttl*(0.5+Math.random());
+      pos[i*3]=e.x+(Math.random()-0.5)*e.spread;
+      pos[i*3+1]=e.y+Math.random()*0.6;
+      pos[i*3+2]=e.z+(Math.random()-0.5)*1.6;
+      vel[i*3]=(Math.random()-0.5)*3;
+      vel[i*3+1]=e.up*(0.7+Math.random()*0.8);
+      vel[i*3+2]=e.dz*(0.7+Math.random());
+    }
+  }
+  sys.geometry.attributes.position.needsUpdate=true;
+}
+// 수위 게이지(발광 링이 수면 높이를 가리킴)
+const gaugeRings={};
+function makeGauge(x,z,col,key){
+  const g=new THREE.Group();
+  const pole=new THREE.Mesh(new THREE.CylinderGeometry(0.18,0.18,17,8),matWhite); pole.position.y=4.5; g.add(pole);
+  for(let i=0;i<9;i++){ const tk=new THREE.Mesh(new THREE.BoxGeometry(1.3,0.14,0.14),i%2?matGate:matSteelD); tk.position.y=i-3.5; g.add(tk); }
+  const ring=new THREE.Mesh(new THREE.TorusGeometry(0.85,0.2,8,20),
+    new THREE.MeshStandardMaterial({color:col,emissive:col,emissiveIntensity:0.9}));
+  ring.rotation.x=Math.PI/2; g.add(ring); g.position.set(x,0,z); scene.add(g); gaugeRings[key]=ring;
+}
+makeGauge(turbX0-6,-BARRIER_W/2-9,0x53b9ff,'sea');
+makeGauge(gateX0+GATE_SPAN+4,BARRIER_W/2+9,0x36e0c4,'lake');
+// 실시간 낙차/통수량/출력 라벨(스프라이트)
+function rrect(x,a,b,w,h,r){ x.beginPath(); x.moveTo(a+r,b); x.arcTo(a+w,b,a+w,b+h,r); x.arcTo(a+w,b+h,a,b+h,r); x.arcTo(a,b+h,a,b,r); x.arcTo(a,b,a+w,b,r); x.closePath(); }
+const lbl=(()=>{ const c=document.createElement('canvas'); c.width=340; c.height=158;
+  const t=new THREE.CanvasTexture(c);
+  const s=new THREE.Sprite(new THREE.SpriteMaterial({map:t,transparent:true,depthTest:false}));
+  s.scale.set(28,13,1); s.position.set(-6,deckY+27,BZ); s.renderOrder=20; scene.add(s);
+  return {c,t,s,last:-1}; })();
+function drawLabel(head,Q,pw,stateTxt){
+  const x=lbl.c.getContext('2d'); x.clearRect(0,0,340,158);
+  x.fillStyle='rgba(8,18,33,0.85)'; rrect(x,3,3,334,152,18); x.fill();
+  x.strokeStyle='rgba(54,224,196,0.7)'; x.lineWidth=2.5; rrect(x,3,3,334,152,18); x.stroke();
+  x.textAlign='left'; x.fillStyle='#9fe9ff'; x.font='bold 21px sans-serif'; x.fillText(stateTxt,20,32);
+  x.fillStyle='#fff';    x.font='bold 33px sans-serif'; x.fillText('낙차 H   '+head.toFixed(2)+' m',20,72);
+  x.fillStyle='#ffd34d'; x.font='600 23px sans-serif';  x.fillText('통수량   '+Q.toLocaleString()+' ㎥/s',20,104);
+  x.fillStyle='#7fe07a'; x.font='600 23px sans-serif';  x.fillText('출력      '+pw.toFixed(0)+' MW',20,136);
+  lbl.t.needsUpdate=true;
+}
 
 // ====================================================================
 //  시뮬 상태 + 파라미터
@@ -697,39 +769,60 @@ function tick(now){
   const dtReal=Math.min((now-prev)/1000,0.05); prev=now;
   controls.update();
   if(rt.playing){ const dtHr=dtReal*rt.speed/3600; integrate(sim,P,dtHr); }
-  animateScene(now*0.001);
+  animateScene(now*0.001, dtReal);
   updateCamera(dtReal);
   updateHUD();
   renderer.render(scene,camera);
   requestAnimationFrame(tick);
 }
-function animateScene(t){
+function animateScene(t, dt){
   updateWater(sea,seaBase,sim.sea,t);
   updateWater(lake,lakeBase,sim.lake,t*0.8);
   const head=Math.max(sim.sea-sim.lake,0);
-  const spin=sim.state==='GEN'?(0.4+head*0.16):0;
+  const rev=Math.max(sim.lake-sim.sea,0);
+  const spin=sim.state==='GEN'?(0.5+head*0.22):0;
   const nOn=sim.state==='GEN'?P.nTurb:0;
+  // --- 터빈: 러너·흡입 팬 회전 + 발광 림 + 유량 비례 통수 ---
   turbines.forEach((tb,i)=>{
     tb.on=i<nOn;
-    if(tb.on) tb.runner.rotation.z+=spin;
-    tb.flow.material.opacity+=((tb.on?0.9:0)-tb.flow.material.opacity)*0.1;
-    if(tb.on) advect(tb.flow,+1,0.6+head*0.25);
+    if(tb.on){ tb.runner.rotation.z+=spin; tb.fan.rotation.z+=spin; }
+    const target=tb.on?0.95:0;
+    tb.flow.material.opacity+=(target-tb.flow.material.opacity)*0.12;
+    tb.flow.material.size=0.7+head*0.13;
+    tb.glow.material.emissiveIntensity+=((tb.on?0.7+0.3*Math.sin(t*6+i):0)-tb.glow.material.emissiveIntensity)*0.1;
+    if(tb.on) advect(tb.flow,+1,0.7+head*0.3);
   });
-  const rev=Math.max(sim.lake-sim.sea,0);
+  // --- 수문: 게이트 상하 + 유량 비례 배수 ---
   gates.forEach((g,i)=>{
     g.open=(sim.state==='SLUICE')&&i<P.nGate;
     g.pos+=((g.open?1:0)-g.pos)*0.06;
     g.gate.position.y=gateShutY+(gateOpenY-gateShutY)*g.pos;
     const flowing=g.open&&rev>0;
-    g.flow.material.opacity+=((flowing?0.85:0)-g.flow.material.opacity)*0.1;
-    if(flowing) advect(g.flow,-1,0.7+rev*0.2);
+    g.flow.material.opacity+=((flowing?0.9:0)-g.flow.material.opacity)*0.12;
+    g.flow.material.size=0.7+rev*0.18;
+    if(flowing) advect(g.flow,-1,0.8+rev*0.25);
   });
+  // --- 수위 게이지(발광 링) ---
+  if(gaugeRings.sea){ gaugeRings.sea.position.y=sim.sea; gaugeRings.lake.position.y=sim.lake; }
+  // --- 물보라/포말: 유량(㎥/s)에 비례 ---
+  const qIn =(sim.state==='GEN'&&head>0)? turbFlow(head)*nOn : 0;
+  const qOut=(sim.state==='SLUICE'&&rev>0)? gateFlow(rev)*P.nGate : 0;
+  updateSpray(sprayGen,dt,{rate:Math.min(qIn/650,8),ttl:0.9,
+    x:turbX0+TURB_SPAN/2,y:sim.lake+0.3,z:BARRIER_W/2+1.5,spread:TURB_SPAN*0.55,up:2.6,dz:2.2});
+  updateSpray(spraySluice,dt,{rate:Math.min(qOut/1100,10),ttl:1.1,
+    x:gateX0+GATE_SPAN/2,y:Math.max(sim.sea,1)+0.2,z:-BARRIER_W/2-1.5,spread:GATE_SPAN*0.55,up:3.4,dz:-2.8});
+  // --- 실시간 라벨(낙차·통수량·출력) ---
+  if(t-lbl.last>0.12){
+    const st=({WAIT:'① 낙차 축적',GEN:'② 발전 중',WAIT_HIGH:'③ 만조 정체',SLUICE:'④ 배수 중'})[sim.state]||'';
+    drawLabel(head, Math.round(qIn||qOut), sim.power, st);
+    lbl.last=t;
+  }
   if(window.__beacon) window.__beacon.material.emissiveIntensity=0.5+Math.abs(Math.sin(t*2))*1.0;
 }
 function updateWater(mesh,base,level,t){
   const p=mesh.geometry.attributes.position.array;
   for(let i=0;i<p.length;i+=3){
-    p[i+2]=base[i+2]+Math.sin(base[i]*0.03+t)*0.25+Math.cos(base[i+1]*0.04+t*1.3)*0.25;
+    p[i+2]=base[i+2]+Math.sin(base[i]*0.03+t)*0.42+Math.cos(base[i+1]*0.045+t*1.3)*0.34+Math.sin(base[i]*0.12+t*2.2)*0.12;
   }
   mesh.geometry.attributes.position.needsUpdate=true; mesh.position.y=level;
 }
