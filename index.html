@@ -314,7 +314,8 @@ function runSweep(amp){
 //  렌더러 / 씬 / 카메라
 // ====================================================================
 const app = document.getElementById('app');
-const renderer = new THREE.WebGLRenderer({ antialias:true });
+const REC = new URLSearchParams(location.search).has('record'); // 녹화용 결정론 모드
+const renderer = new THREE.WebGLRenderer({ antialias:true, preserveDrawingBuffer:REC });
 renderer.setPixelRatio(Math.min(devicePixelRatio,2));
 renderer.setSize(innerWidth, innerHeight);
 renderer.shadowMap.enabled = true;
@@ -833,17 +834,16 @@ function drawChart(res){
 // ====================================================================
 //  애니메이션 루프
 // ====================================================================
-let prev=performance.now();
-function tick(now){
-  const dtReal=Math.min((now-prev)/1000,0.05); prev=now;
+function frame(nowSec, dtReal){
   if(rt.playing){ const dtHr=dtReal*rt.speed/3600; integrate(sim,P,dtHr); }
-  animateScene(now*0.001, dtReal);
+  animateScene(nowSec, dtReal);
   if(tour){ updateTour(dtReal); camera.lookAt(controls.target); }
   else { updateCamera(dtReal); controls.update(); }
   updateHUD();
   renderer.render(scene,camera);
-  requestAnimationFrame(tick);
 }
+let prev=performance.now();
+function tick(now){ const dt=Math.min((now-prev)/1000,0.05); prev=now; frame(now*0.001,dt); requestAnimationFrame(tick); }
 function animateScene(t, dt){
   updateWater(sea,seaBase,sim.sea,t);
   updateWater(lake,lakeBase,sim.lake,t*0.8);
@@ -938,7 +938,17 @@ function updateHUD(){
 addEventListener('resize',()=>{ camera.aspect=innerWidth/innerHeight; camera.updateProjectionMatrix(); renderer.setSize(innerWidth,innerHeight); });
 
 $('loading').style.display='none';
-requestAnimationFrame(tick);
+if(REC){
+  // 헤드리스 녹화 API: 외부에서 프레임을 결정론적으로 진행시키고 JPEG로 캡처
+  let rt0=0;
+  window.__rec={ ready:true,
+    frame:(dt)=>{ rt0+=dt; frame(rt0,dt); return renderer.domElement.toDataURL('image/jpeg',0.92); },
+    setSpeed:s=>{ rt.speed=s; }, setPlaying:b=>{ rt.playing=b; },
+    mode:m=>setMode(m), night:b=>setNight(b), tour:b=>setTour(b),
+    view:i=>{ if(tour) setTour(false); camIdx=i%camViews.length; applyView(camIdx,true); } };
+} else {
+  requestAnimationFrame(tick);
+}
 </script>
 </body>
 </html>
