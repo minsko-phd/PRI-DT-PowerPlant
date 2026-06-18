@@ -132,6 +132,8 @@
 
 <div class="hud" id="topbtns">
   <button id="bView">🎥 시점 전환</button>
+  <button id="bTour">🎬 시네마틱</button>
+  <button id="bNight">🌙 야간</button>
   <button id="bFull">⛶ 전체화면</button>
   <button id="bPlay">⏸ 일시정지</button>
 </div>
@@ -229,6 +231,7 @@
 <script type="module">
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { Reflector } from 'three/addons/objects/Reflector.js';
 
 // ====================================================================
 //  시화호 조력발전소 디지털 트윈
@@ -345,22 +348,41 @@ controls.enableDamping = true; controls.dampingFactor = 0.08;
 controls.maxPolarAngle = Math.PI*0.495; controls.minDistance = 22; controls.maxDistance = 700;
 applyView(0, true);
 
-// ---- 하늘 ----
-{
+// ---- 하늘(주간/야간 전환) ----
+function makeSkyTex(a,b,c2){
   const c=document.createElement('canvas'); c.width=2;c.height=256;
   const ctx=c.getContext('2d'); const g=ctx.createLinearGradient(0,0,0,256);
-  g.addColorStop(0,'#2f6395'); g.addColorStop(0.45,'#79add4'); g.addColorStop(1,'#d6e7f1');
-  ctx.fillStyle=g; ctx.fillRect(0,0,2,256);
-  const sky=new THREE.Mesh(new THREE.SphereGeometry(2400,32,16),
-    new THREE.MeshBasicMaterial({map:new THREE.CanvasTexture(c),side:THREE.BackSide}));
-  scene.add(sky);
+  g.addColorStop(0,a); g.addColorStop(0.45,b); g.addColorStop(1,c2);
+  ctx.fillStyle=g; ctx.fillRect(0,0,2,256); return new THREE.CanvasTexture(c);
 }
+const skyDay=makeSkyTex('#2f6395','#79add4','#d6e7f1');
+const skyNight=makeSkyTex('#05070e','#0a1430','#16294a');
+const skyMesh=new THREE.Mesh(new THREE.SphereGeometry(2400,32,16),
+  new THREE.MeshBasicMaterial({map:skyDay,side:THREE.BackSide}));
+scene.add(skyMesh);
+// 별(야간에만 보임)
+const stars=(()=>{ const N=700,g=new THREE.BufferGeometry(),p=new Float32Array(N*3);
+  for(let i=0;i<N;i++){ const v=new THREE.Vector3().randomDirection().multiplyScalar(2300); p[i*3]=v.x;p[i*3+1]=Math.abs(v.y);p[i*3+2]=v.z; }
+  g.setAttribute('position',new THREE.BufferAttribute(p,3));
+  const m=new THREE.Points(g,new THREE.PointsMaterial({color:0xffffff,size:3.2,sizeAttenuation:false,transparent:true,opacity:0}));
+  scene.add(m); return m; })();
+
 // ---- 조명 ----
-scene.add(new THREE.HemisphereLight(0xd2ebff,0x55624a,0.9));
+const hemi=new THREE.HemisphereLight(0xd2ebff,0x55624a,0.9); scene.add(hemi);
 const sun=new THREE.DirectionalLight(0xfff2dc,1.55);
 sun.position.set(135,170,80); sun.castShadow=true; sun.shadow.mapSize.set(2048,2048);
 const sc=sun.shadow.camera; sc.near=10;sc.far=700;sc.left=-260;sc.right=260;sc.top=260;sc.bottom=-260;
 sun.shadow.bias=-0.0004; scene.add(sun);
+
+// ---- 환경맵(수면 반사용 IBL) ----
+const pmrem=new THREE.PMREMGenerator(renderer);
+function bakeEnv(tex){
+  const es=new THREE.Scene();
+  es.add(new THREE.Mesh(new THREE.SphereGeometry(100,16,8),
+    new THREE.MeshBasicMaterial({map:tex,side:THREE.BackSide})));
+  const rt=pmrem.fromScene(es); return rt.texture;
+}
+scene.environment = bakeEnv(skyDay);
 
 // ====================================================================
 //  재질
@@ -601,16 +623,35 @@ for(let i=0;i<3;i++){
 // ====================================================================
 //  바다 / 호소 수면
 // ====================================================================
-function waterMesh(color, side){
+function waterMesh(color, side, opacity){
   const geo=new THREE.PlaneGeometry(1800,820,60,28);
   const m=new THREE.Mesh(geo,new THREE.MeshStandardMaterial({
-    color,transparent:true,opacity:0.84,roughness:0.16,metalness:0.18}));
+    color,transparent:true,opacity,roughness:0.08,metalness:0.4,envMapIntensity:1.2}));
   m.rotation.x=-Math.PI/2; m.position.z=side*(820/2+BARRIER_W/2-1); m.renderOrder=2; return m;
 }
-const sea=waterMesh(0x3a6f8a,-1), lake=waterMesh(0x1f9e8f,+1);
+const sea=waterMesh(0x3a6f8a,-1,0.82), lake=waterMesh(0x1f9e8f,+1,0.5);
 scene.add(sea,lake);
 const seaBase=sea.geometry.attributes.position.array.slice();
 const lakeBase=lake.geometry.attributes.position.array.slice();
+
+// 호소(잔잔한 내측) 평면 거울 반사 — 방조제·전망대가 비침
+const lakeReflector=new Reflector(new THREE.PlaneGeometry(1700,780),
+  {textureWidth:1024,textureHeight:1024,color:0x95b6b0,clipBias:0.004});
+lakeReflector.rotation.x=-Math.PI/2;
+lakeReflector.position.z=+(820/2+BARRIER_W/2-1);
+scene.add(lakeReflector);
+
+// 야간 조명 그룹(야간 모드에서만 점등)
+const nightLights=new THREE.Group(); nightLights.visible=false; scene.add(nightLights);
+function addPL(color,intensity,dist,x,y,z){
+  const l=new THREE.PointLight(color,intensity,dist); l.position.set(x,y,z); nightLights.add(l);
+  const b=new THREE.Mesh(new THREE.SphereGeometry(0.45,8,6),new THREE.MeshBasicMaterial({color}));
+  b.position.set(x,y,z); nightLights.add(b);
+}
+for(let i=0;i<5;i++) addPL(0xffd9a0,1.3,70, turbX0+12+i*24, deckY+9, BZ);   // 발전동
+for(let i=0;i<PLANT.nGates;i+=2) addPL(0xfff0c0,0.7,32, gateX0+GATE_PITCH*(i+0.5), deckY+8, BZ-BARRIER_W/2+1.5); // 수문 모터
+addPL(0x9fd0ff,2.4,140, gateX0-8, 56, BZ-3);                                // 전망대 포드
+for(let x=-BARRIER_LEN/2+14;x<BARRIER_LEN/2;x+=34) addPL(0xfff2c8,0.5,42, x, deckY+3, BZ-4.4); // 가로등
 landStrip(-(820+BARRIER_W/2)-6,0x7d7152); landStrip(+(820+BARRIER_W/2)+6,0x6f7d4a);
 
 // ============ 화려한 가시화: 물보라/포말 · 수위 게이지 · 실시간 라벨 ============
@@ -712,8 +753,36 @@ $('mManual').onclick=()=>setMode('manual');
 $('mAI').onclick=()=>setMode('ai');
 $('bReset').onclick=()=>{ sim=freshState(); };
 $('bPlay').onclick=()=>{ rt.playing=!rt.playing; $('bPlay').textContent=rt.playing?'⏸ 일시정지':'▶ 재생'; };
-$('bView').onclick=()=>{ camIdx=(camIdx+1)%camViews.length; applyView(camIdx); };
+$('bView').onclick=()=>{ if(tour) setTour(false); camIdx=(camIdx+1)%camViews.length; applyView(camIdx); };
 $('bFull').onclick=()=>{ if(!document.fullscreenElement) document.documentElement.requestFullscreen(); else document.exitFullscreen(); };
+
+// ---------- 야간/조명 모드 ----------
+let night=false;
+function setNight(on){
+  night=on;
+  skyMesh.material.map = on?skyNight:skyDay; skyMesh.material.needsUpdate=true;
+  scene.environment = bakeEnv(on?skyNight:skyDay);
+  sun.intensity=on?0.25:1.55; sun.color.set(on?0x9fb6ff:0xfff2dc);
+  hemi.intensity=on?0.22:0.9; hemi.color.set(on?0x24406b:0xd2ebff);
+  renderer.toneMappingExposure=on?1.32:1.08;
+  scene.fog.color.set(on?0x0a1426:0xaecadb); scene.fog.density=on?0.0010:0.0014;
+  nightLights.visible=on; stars.material.opacity=on?0.9:0;
+  $('bNight').textContent=on?'☀️ 주간':'🌙 야간';
+}
+$('bNight').onclick=()=>setNight(!night);
+
+// ---------- 시네마틱 자동 투어 ----------
+const tourPos=new THREE.CatmullRomCurve3([
+  [185,115,185],[12,34,150],[-55,15,42],[22,12,40],[78,48,18],[125,30,120],[0,165,55]
+].map(a=>new THREE.Vector3(...a)),true,'catmullrom',0.4);
+const tourTgt=new THREE.CatmullRomCurve3([
+  [0,6,0],[-10,8,8],[-35,5,2],[20,4,4],[gateX0-8,34,-3],[gateX0,2,40],[0,0,0]
+].map(a=>new THREE.Vector3(...a)),true,'catmullrom',0.4);
+let tour=false, tourS=0;
+function setTour(on){ tour=on; controls.enabled=!on; camAnim=0; $('bTour').textContent=on?'⏹ 투어 중지':'🎬 시네마틱'; }
+function updateTour(dt){ tourS=(tourS+dt*0.016)%1; camera.position.copy(tourPos.getPoint(tourS)); controls.target.copy(tourTgt.getPoint(tourS)); }
+$('bTour').onclick=()=>setTour(!tour);
+renderer.domElement.addEventListener('pointerdown',()=>{ if(tour) setTour(false); });
 
 // ---------- 최적화 차트 ----------
 let chartShown=false, lastSweep=null;
@@ -767,10 +836,10 @@ function drawChart(res){
 let prev=performance.now();
 function tick(now){
   const dtReal=Math.min((now-prev)/1000,0.05); prev=now;
-  controls.update();
   if(rt.playing){ const dtHr=dtReal*rt.speed/3600; integrate(sim,P,dtHr); }
   animateScene(now*0.001, dtReal);
-  updateCamera(dtReal);
+  if(tour){ updateTour(dtReal); camera.lookAt(controls.target); }
+  else { updateCamera(dtReal); controls.update(); }
   updateHUD();
   renderer.render(scene,camera);
   requestAnimationFrame(tick);
@@ -802,8 +871,9 @@ function animateScene(t, dt){
     g.flow.material.size=0.7+rev*0.18;
     if(flowing) advect(g.flow,-1,0.8+rev*0.25);
   });
-  // --- 수위 게이지(발광 링) ---
+  // --- 수위 게이지(발광 링) + 호소 거울 수위 추종 ---
   if(gaugeRings.sea){ gaugeRings.sea.position.y=sim.sea; gaugeRings.lake.position.y=sim.lake; }
+  lakeReflector.position.y=sim.lake-0.6;
   // --- 물보라/포말: 유량(㎥/s)에 비례 ---
   const qIn =(sim.state==='GEN'&&head>0)? turbFlow(head)*nOn : 0;
   const qOut=(sim.state==='SLUICE'&&rev>0)? gateFlow(rev)*P.nGate : 0;
