@@ -1,0 +1,747 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>시화호 조력발전소 디지털 트윈 — 발전량 최적화 시뮬레이션</title>
+<style>
+  :root{
+    --red:#A60437; --teal:#0E7C7B; --gray:#757575; --green:#2D6A2D;
+    --ink:#0d1b2a; --panel:rgba(10,22,40,0.82); --line:rgba(255,255,255,0.12);
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;height:100%;overflow:hidden;background:#05080f;
+    font-family:'Malgun Gothic','Apple SD Gothic Neo',Arial,sans-serif;color:#e8eef6;}
+  #app{position:fixed;inset:0;}
+  canvas{display:block;}
+
+  /* ---------- HUD ---------- */
+  .hud{position:fixed;z-index:10;}
+  #title{top:14px;left:16px;max-width:430px;}
+  #title h1{margin:0;font-size:17px;letter-spacing:-0.3px;}
+  #title h1 b{color:#ff5b86;}
+  #title p{margin:4px 0 0;font-size:11.5px;color:#9fb0c6;line-height:1.5;}
+  .tag{display:inline-block;margin-top:6px;padding:2px 8px;border-radius:10px;
+    font-size:10.5px;background:rgba(14,124,123,0.25);border:1px solid rgba(14,124,123,0.5);color:#7fe7e4;}
+
+  /* metrics */
+  #metrics{top:14px;right:16px;width:226px;background:var(--panel);
+    border:1px solid var(--line);border-radius:14px;padding:14px 14px 10px;backdrop-filter:blur(8px);}
+  #metrics .big{font-size:12px;color:#9fb0c6;margin-bottom:2px;}
+  #power{font-size:34px;font-weight:800;line-height:1;letter-spacing:-1px;}
+  #power small{font-size:14px;color:#9fb0c6;font-weight:600;}
+  .bar{height:8px;border-radius:5px;background:rgba(255,255,255,0.10);margin:8px 0 12px;overflow:hidden;}
+  .bar>span{display:block;height:100%;width:0%;background:linear-gradient(90deg,#0E7C7B,#36d1c4);transition:width .2s;}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:8px 10px;}
+  .cell .k{font-size:10px;color:#8aa0ba;}
+  .cell .v{font-size:16px;font-weight:700;letter-spacing:-0.5px;}
+  .cell .v u{font-size:10px;color:#8aa0ba;text-decoration:none;font-weight:600;}
+  #state{margin-top:10px;padding:7px 10px;border-radius:9px;font-size:12px;font-weight:700;text-align:center;}
+
+  /* controls */
+  #panel{bottom:14px;left:16px;width:300px;background:var(--panel);
+    border:1px solid var(--line);border-radius:14px;padding:14px;backdrop-filter:blur(8px);}
+  #panel h2{margin:0 0 10px;font-size:12.5px;color:#cdd9e8;display:flex;align-items:center;gap:7px;}
+  #panel h2:before{content:"";width:9px;height:9px;border-radius:50%;background:var(--red);}
+  .row{display:flex;align-items:center;gap:8px;margin:9px 0;font-size:11.5px;}
+  .row label{flex:0 0 96px;color:#aebfd2;}
+  .row input[type=range]{flex:1;accent-color:#36d1c4;}
+  .row .val{flex:0 0 52px;text-align:right;font-variant-numeric:tabular-nums;color:#fff;font-weight:700;}
+  .modes{display:flex;gap:6px;margin-bottom:10px;}
+  .modes button{flex:1;padding:8px 4px;border-radius:9px;border:1px solid var(--line);
+    background:rgba(255,255,255,0.05);color:#cdd9e8;font-size:11.5px;cursor:pointer;font-weight:700;transition:.15s;}
+  .modes button.on{background:var(--red);border-color:var(--red);color:#fff;}
+  .modes button.ai.on{background:var(--teal);border-color:var(--teal);}
+  .opt{display:flex;gap:6px;margin-top:4px;}
+  .opt button{flex:1;padding:7px;border-radius:9px;border:1px solid var(--line);
+    background:rgba(255,255,255,0.05);color:#cdd9e8;font-size:11px;cursor:pointer;}
+  .opt button:hover{background:rgba(255,255,255,0.12);}
+  .hint{font-size:10px;color:#7b8ba1;margin-top:9px;line-height:1.45;}
+
+  /* compare readout */
+  #compare{bottom:14px;right:16px;width:226px;background:var(--panel);
+    border:1px solid var(--line);border-radius:14px;padding:13px 14px;backdrop-filter:blur(8px);font-size:11.5px;}
+  #compare h3{margin:0 0 8px;font-size:12px;color:#cdd9e8;}
+  #compare .line{display:flex;justify-content:space-between;margin:5px 0;}
+  #compare .line b{color:#36d1c4;font-variant-numeric:tabular-nums;}
+  #compare .delta{margin-top:8px;padding-top:8px;border-top:1px solid var(--line);
+    display:flex;justify-content:space-between;font-weight:700;}
+  #compare .delta b{color:#7fe07a;}
+
+  .legend{position:fixed;left:50%;transform:translateX(-50%);bottom:14px;z-index:10;
+    display:flex;gap:14px;background:var(--panel);border:1px solid var(--line);
+    border-radius:11px;padding:8px 14px;font-size:11px;backdrop-filter:blur(8px);}
+  .legend span{display:flex;align-items:center;gap:6px;color:#bcccde;}
+  .legend i{width:11px;height:11px;border-radius:3px;display:inline-block;}
+
+  #loading{position:fixed;inset:0;z-index:50;display:flex;align-items:center;justify-content:center;
+    background:#05080f;font-size:14px;color:#7fe7e4;letter-spacing:1px;}
+  .credit{position:fixed;left:16px;bottom:138px;font-size:9.5px;color:#5d6b80;z-index:10;}
+  @media (max-height:720px){ #compare{display:none;} }
+</style>
+</head>
+<body>
+<div id="app"></div>
+<div id="loading">시화호 디지털 트윈 로딩 중…</div>
+
+<div class="hud" id="title">
+  <h1>🌊 시화호 조력발전소 <b>디지털 트윈</b></h1>
+  <p>경기도 안산 · 세계 최대 단류식(창조) 조력발전 · 25.4MW 수차발전기 10기 · 수문 8문<br>
+     <b style="color:#7fe7e4">조석 1주기 동안 발전량을 최대로</b> — 수문·터빈 운전 전략 시뮬레이션</p>
+  <span class="tag">Plant OS · Human-in-the-loop · K-TOP Shadow Mode</span>
+</div>
+
+<div class="hud" id="metrics">
+  <div class="big">현재 발전 출력</div>
+  <div id="power">0<small> MW</small></div>
+  <div class="bar"><span id="powerbar"></span></div>
+  <div class="grid2">
+    <div class="cell"><div class="k">바다 수위</div><div class="v"><span id="seaLv">0.0</span><u> m</u></div></div>
+    <div class="cell"><div class="k">호소 수위</div><div class="v"><span id="lakeLv">0.0</span><u> m</u></div></div>
+    <div class="cell"><div class="k">낙차(Head)</div><div class="v"><span id="head">0.0</span><u> m</u></div></div>
+    <div class="cell"><div class="k">가동 터빈</div><div class="v"><span id="nturb">10</span><u> / 10기</u></div></div>
+    <div class="cell"><div class="k">누적 발전</div><div class="v"><span id="energy">0.0</span><u> MWh</u></div></div>
+    <div class="cell"><div class="k">경과 시간</div><div class="v"><span id="clock">00:00</span></div></div>
+  </div>
+  <div id="state">대기</div>
+</div>
+
+<div class="hud" id="panel">
+  <h2>운전 제어 — 발전량 최적화</h2>
+  <div class="modes">
+    <button id="mManual" class="on">수동 운전</button>
+    <button id="mAI" class="ai">AI 최적 운전</button>
+  </div>
+  <div class="row">
+    <label>발전 개시 낙차</label>
+    <input type="range" id="sStart" min="0.3" max="4.0" step="0.1" value="1.0">
+    <span class="val" id="vStart">1.0 m</span>
+  </div>
+  <div class="row">
+    <label>발전 종료 낙차</label>
+    <input type="range" id="sStop" min="0.2" max="2.0" step="0.1" value="0.6">
+    <span class="val" id="vStop">0.6 m</span>
+  </div>
+  <div class="row">
+    <label>가동 터빈 수</label>
+    <input type="range" id="sTurb" min="1" max="10" step="1" value="10">
+    <span class="val" id="vTurb">10기</span>
+  </div>
+  <div class="row">
+    <label>배수 수문 수</label>
+    <input type="range" id="sGate" min="1" max="8" step="1" value="8">
+    <span class="val" id="vGate">8문</span>
+  </div>
+  <div class="row">
+    <label>시뮬 속도</label>
+    <input type="range" id="sSpeed" min="1" max="400" step="1" value="120">
+    <span class="val" id="vSpeed">120×</span>
+  </div>
+  <div class="opt">
+    <button id="bPlay">⏸ 일시정지</button>
+    <button id="bReset">⟲ 리셋</button>
+    <button id="bCam">🎥 시점</button>
+  </div>
+  <p class="hint">단류식 창조발전: ① 수문 닫고 바다↑ 낙차 축적 → ② 바다→호소로 터빈 발전 → ③ 만조 후 수문 열어 호소 배수 → 반복. <b style="color:#ff8fae">개시 낙차</b>를 낮추면 발전시간↑이나 저낙차 손실↑ — 최적점이 존재합니다.</p>
+</div>
+
+<div class="hud" id="compare">
+  <h3>📊 일일 환산 성과</h3>
+  <div class="line"><span>주기당 발전량</span><b><span id="cCycle">0</span> MWh</b></div>
+  <div class="line"><span>일 환산</span><b><span id="cDay">0.00</span> GWh</b></div>
+  <div class="line"><span>연 환산</span><b><span id="cYear">0</span> GWh</b></div>
+  <div class="delta"><span>설계목표 552GWh 대비</span><b><span id="cPct">0</span>%</b></div>
+</div>
+
+<div class="legend">
+  <span><i style="background:#2f6fb0"></i>바다(서해)</span>
+  <span><i style="background:#1f9e8f"></i>시화호</span>
+  <span><i style="background:#d8d2c4"></i>방조제·발전동</span>
+  <span><i style="background:#ffd34d"></i>발전 중 통수</span>
+</div>
+<div class="credit">3D Digital Twin Demo · Three.js · LG PRI Smart Factory 솔루션센터</div>
+
+<script type="importmap">
+{ "imports": {
+  "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+  "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+}}
+</script>
+
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+// ====================================================================
+//  시화호 조력발전소 디지털 트윈 — 3D 씬 + 발전 물리 시뮬레이션
+//  좌표: X = 방조제 길이방향, Z = 바다(−)↔호소(+) 방향, Y = 높이
+// ====================================================================
+
+const PLANT = {
+  nTurbines: 10,        // 수차발전기 10기 (벌브형)
+  nGates: 8,            // 수문 8문
+  ratedMW: 25.4,        // 1기 정격
+  designHead: 5.82,     // 설계 낙차(m)
+  tidalAmp: 3.9,        // 조석 진폭(m) → 조차 ~7.8m
+  meanSea: 5.0,         // 기준 평균 해수면(m, 가시화 기준)
+  periodHr: 12.42,      // 반일주조 주기(h)
+  effGen: 0.90,         // 발전 효율
+};
+
+// ---- DOM refs ----
+const $ = id => document.getElementById(id);
+const ui = {
+  power:$('power'), powerbar:$('powerbar'), seaLv:$('seaLv'), lakeLv:$('lakeLv'),
+  head:$('head'), nturb:$('nturb'), energy:$('energy'), clock:$('clock'), state:$('state'),
+  cCycle:$('cCycle'), cDay:$('cDay'), cYear:$('cYear'), cPct:$('cPct'),
+};
+
+// ---- renderer / scene / camera ----
+const app = $('app');
+const renderer = new THREE.WebGLRenderer({ antialias:true });
+renderer.setPixelRatio(Math.min(devicePixelRatio,2));
+renderer.setSize(innerWidth, innerHeight);
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.05;
+app.appendChild(renderer.domElement);
+
+const scene = new THREE.Scene();
+scene.fog = new THREE.FogExp2(0x9fc0dc, 0.0016);
+
+const camera = new THREE.PerspectiveCamera(48, innerWidth/innerHeight, 0.5, 4000);
+const camViews = [
+  { pos:[150,95,150],  tgt:[0,4,0] },     // 조감
+  { pos:[0,40,160],    tgt:[0,8,10] },    // 바다측 정면
+  { pos:[95,22,28],    tgt:[0,6,5] },     // 발전동 근접
+  { pos:[0,170,2],     tgt:[0,0,0] },     // 평면(탑뷰)
+];
+let camIdx = 0;
+function applyView(i, instant=false){
+  const v = camViews[i];
+  camTarget.set(...v.tgt);
+  if(instant){ camera.position.set(...v.pos); controls.target.copy(camTarget); }
+  else { camGoal.set(...v.pos); camAnim = 1; }
+}
+const camTarget = new THREE.Vector3();
+const camGoal = new THREE.Vector3();
+let camAnim = 0;
+
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true; controls.dampingFactor = 0.08;
+controls.maxPolarAngle = Math.PI*0.495; controls.minDistance = 25; controls.maxDistance = 600;
+applyView(0, true);
+
+// ---- sky ----
+{
+  const c = document.createElement('canvas'); c.width=2; c.height=256;
+  const g = c.getContext('2d').createLinearGradient(0,0,0,256);
+  g.addColorStop(0,'#2b5d8a'); g.addColorStop(0.5,'#7bb0d6'); g.addColorStop(1,'#cfe3f0');
+  const ctx=c.getContext('2d'); ctx.fillStyle=g; ctx.fillRect(0,0,2,256);
+  const tex = new THREE.CanvasTexture(c);
+  const sky = new THREE.Mesh(new THREE.SphereGeometry(2000,32,16),
+    new THREE.MeshBasicMaterial({ map:tex, side:THREE.BackSide }));
+  scene.add(sky);
+}
+
+// ---- lights ----
+scene.add(new THREE.HemisphereLight(0xcfe6ff, 0x4a5a44, 0.85));
+const sun = new THREE.DirectionalLight(0xfff3e0, 1.5);
+sun.position.set(120, 160, 90); sun.castShadow = true;
+sun.shadow.mapSize.set(2048,2048);
+const sc = sun.shadow.camera; sc.near=10; sc.far=600; sc.left=-220; sc.right=220; sc.top=220; sc.bottom=-220;
+sun.shadow.bias = -0.0004;
+scene.add(sun);
+
+// ====================================================================
+//  지형 / 해저
+// ====================================================================
+const BARRIER_LEN = 240;   // 방조제 가시 길이
+const BARRIER_Z = 0;       // 방조제 중심
+const BARRIER_W = 26;      // 방조제 폭(Z방향)
+const seabedY = -8;
+
+{
+  const seabed = new THREE.Mesh(
+    new THREE.PlaneGeometry(1600,1600,1,1),
+    new THREE.MeshStandardMaterial({ color:0x6b6048, roughness:1 }));
+  seabed.rotation.x = -Math.PI/2; seabed.position.y = seabedY; seabed.receiveShadow = true;
+  scene.add(seabed);
+}
+
+// 양안 매립지(바다측/호소측 둑) — 방조제가 화면 밖으로 이어지는 느낌
+function landStrip(z, depth, color){
+  const m = new THREE.Mesh(new THREE.BoxGeometry(1600, 7, depth),
+    new THREE.MeshStandardMaterial({ color, roughness:1 }));
+  m.position.set(0, -0.5, z); m.receiveShadow = true; scene.add(m);
+}
+
+// ====================================================================
+//  방조제 본체 + 발전동(파워하우스) + 수문부(슬루스)
+//  배치: 좌측 절반 = 발전동(터빈 10기), 우측 절반 = 수문부(8문)
+// ====================================================================
+const concrete = new THREE.MeshStandardMaterial({ color:0xd8d2c4, roughness:0.85 });
+const concreteDark = new THREE.MeshStandardMaterial({ color:0xb9b3a4, roughness:0.9 });
+const steel = new THREE.MeshStandardMaterial({ color:0x55636e, roughness:0.5, metalness:0.6 });
+const steelDark = new THREE.MeshStandardMaterial({ color:0x37424c, roughness:0.6, metalness:0.5 });
+const yellowMat = new THREE.MeshStandardMaterial({ color:0xf2b134, roughness:0.6 });
+
+const barrier = new THREE.Group(); scene.add(barrier);
+
+const TURB_SPAN = 120;     // 발전동 차지 X폭
+const GATE_SPAN  = 96;     // 수문부 차지 X폭
+const turbX0 = -BARRIER_LEN/2 + 8;             // 발전동 시작
+const gateX0 = turbX0 + TURB_SPAN + 8;         // 수문부 시작
+const deckY = 9;           // 방조제 상단 높이(도로면)
+
+// --- 방조제 양끝 매립 둑(발전동/수문부 사이 및 양 끝) ---
+function dyke(xc, w){
+  const m = new THREE.Mesh(new THREE.BoxGeometry(w, deckY+1, BARRIER_W), concrete);
+  m.position.set(xc, (deckY+1)/2 - 1, BARRIER_Z); m.castShadow=m.receiveShadow=true; barrier.add(m);
+  // 사면(바다측)
+  const slope = new THREE.Mesh(new THREE.BoxGeometry(w, 6, 6), concreteDark);
+  slope.position.set(xc, 1, BARRIER_Z - BARRIER_W/2 - 2.2); slope.rotation.x = 0.5; barrier.add(slope);
+}
+dyke(turbX0 - 8, 16);                       // 좌단
+dyke(gateX0 - 8, 16);                        // 중앙(발전동·수문 사이)
+dyke(gateX0 + GATE_SPAN + 8, 16);            // 우단
+
+// 상단 도로(방조제 위 왕복도로)
+{
+  const road = new THREE.Mesh(new THREE.BoxGeometry(BARRIER_LEN, 0.6, 9), steelDark);
+  road.position.set(0, deckY+0.3, BARRIER_Z); road.castShadow=true; barrier.add(road);
+  // 차선
+  for(let x=-BARRIER_LEN/2+6; x<BARRIER_LEN/2; x+=10){
+    const d = new THREE.Mesh(new THREE.BoxGeometry(4,0.05,0.35),
+      new THREE.MeshStandardMaterial({color:0xf0e9d0}));
+    d.position.set(x, deckY+0.62, BARRIER_Z); barrier.add(d);
+  }
+  // 난간
+  for(const z of [BARRIER_Z-4.4, BARRIER_Z+4.4]){
+    const rail = new THREE.Mesh(new THREE.BoxGeometry(BARRIER_LEN,0.7,0.15), steel);
+    rail.position.set(0, deckY+1.0, z); barrier.add(rail);
+  }
+}
+
+// --------------------------------------------------------------------
+//  발전동(파워하우스): 10기 벌브형 수차발전기
+//  바다↔호소를 관통하는 통수로 + 회전 러너 + 발전동 상부 건물
+// --------------------------------------------------------------------
+const turbines = [];   // {runner, flowPts, mat, x}
+const TURB_PITCH = TURB_SPAN / PLANT.nTurbines;
+
+// 발전동 상부 매스
+{
+  const house = new THREE.Mesh(new THREE.BoxGeometry(TURB_SPAN+6, 7, BARRIER_W+4), concrete);
+  house.position.set(turbX0 + TURB_SPAN/2, deckY+3.5, BARRIER_Z);
+  house.castShadow=house.receiveShadow=true; barrier.add(house);
+  // 상부 천창/리브
+  for(let i=0;i<PLANT.nTurbines;i++){
+    const x = turbX0 + TURB_PITCH*(i+0.5);
+    const rib = new THREE.Mesh(new THREE.BoxGeometry(TURB_PITCH-2, 1.6, BARRIER_W+5), concreteDark);
+    rib.position.set(x, deckY+7.3, BARRIER_Z); rib.castShadow=true; barrier.add(rib);
+    const win = new THREE.Mesh(new THREE.BoxGeometry(TURB_PITCH-4, 3, 0.3),
+      new THREE.MeshStandardMaterial({color:0x2a4a63, metalness:0.4, roughness:0.3}));
+    win.position.set(x, deckY+3.5, BARRIER_Z - (BARRIER_W+4)/2 - 0.2); barrier.add(win);
+  }
+  // 발전동 벽면 하부(수중 콘크리트 매스)
+  const base = new THREE.Mesh(new THREE.BoxGeometry(TURB_SPAN+6, 14, BARRIER_W+4), concreteDark);
+  base.position.set(turbX0 + TURB_SPAN/2, -3, BARRIER_Z); base.castShadow=base.receiveShadow=true; barrier.add(base);
+}
+
+// 각 터빈 통수로 + 러너
+const flowGeoCount = 26;
+for(let i=0;i<PLANT.nTurbines;i++){
+  const x = turbX0 + TURB_PITCH*(i+0.5);
+  // 통수 터널(바다측·호소측 개구부)
+  const tunnel = new THREE.Mesh(new THREE.CylinderGeometry(2.4,2.4,BARRIER_W+5,20,1,true), steelDark);
+  tunnel.rotation.x = Math.PI/2; tunnel.position.set(x, 1.0, BARRIER_Z); barrier.add(tunnel);
+  // 개구부 림(바다측)
+  const rim = new THREE.Mesh(new THREE.TorusGeometry(2.5,0.35,10,24), steel);
+  rim.position.set(x, 1.0, BARRIER_Z - (BARRIER_W+5)/2); barrier.add(rim);
+  // 벌브 러너(프로펠러)
+  const runner = new THREE.Group();
+  const hub = new THREE.Mesh(new THREE.SphereGeometry(0.9,16,12), steel);
+  runner.add(hub);
+  const bladeMat = new THREE.MeshStandardMaterial({ color:0x8fa3b3, metalness:0.7, roughness:0.35, side:THREE.DoubleSide });
+  for(let b=0;b<4;b++){
+    const blade = new THREE.Mesh(new THREE.BoxGeometry(0.18,2.0,0.9), bladeMat);
+    blade.position.y = 1.1; blade.rotation.z = 0.5;
+    const arm = new THREE.Group(); arm.add(blade); arm.rotation.x = b*Math.PI/2;
+    runner.add(arm);
+  }
+  runner.rotation.x = Math.PI/2;
+  runner.position.set(x, 1.0, BARRIER_Z - 2);
+  barrier.add(runner);
+
+  // 통수 입자(발전 시 바다→호소 흐름)
+  const fp = new THREE.BufferGeometry();
+  const pos = new Float32Array(flowGeoCount*3);
+  const seed = new Float32Array(flowGeoCount);
+  for(let k=0;k<flowGeoCount;k++){
+    seed[k]=Math.random();
+    pos[k*3]=x + (Math.random()-0.5)*2.6;
+    pos[k*3+1]=1.0 + (Math.random()-0.5)*2.6;
+    pos[k*3+2]=BARRIER_Z;
+  }
+  fp.setAttribute('position', new THREE.BufferAttribute(pos,3));
+  fp.userData.seed = seed; fp.userData.x = x;
+  const fmat = new THREE.PointsMaterial({ color:0xffd34d, size:0.7, transparent:true, opacity:0 });
+  const flow = new THREE.Points(fp, fmat);
+  barrier.add(flow);
+
+  turbines.push({ runner, flow, x, on:true });
+}
+
+// --------------------------------------------------------------------
+//  수문부(슬루스 게이트) : 8문 — 콘크리트 피어 + 상하 이동 게이트 + 권양 트러스
+// --------------------------------------------------------------------
+const gates = [];
+const GATE_PITCH = GATE_SPAN / PLANT.nGates;
+const gateWidth = GATE_PITCH*0.66;
+const gateOpenY = deckY-1.5;        // 게이트가 올라간 위치
+const gateShutY = -2.0;             // 게이트가 내려와 막은 위치
+
+// 수문부 하부 매스
+{
+  const base = new THREE.Mesh(new THREE.BoxGeometry(GATE_SPAN+4, 10, BARRIER_W), concreteDark);
+  base.position.set(gateX0 + GATE_SPAN/2, -4, BARRIER_Z); base.castShadow=base.receiveShadow=true; barrier.add(base);
+  // 바닥 통수 문턱
+  const sill = new THREE.Mesh(new THREE.BoxGeometry(GATE_SPAN+4, 1.6, BARRIER_W), concrete);
+  sill.position.set(gateX0 + GATE_SPAN/2, -2.2, BARRIER_Z); barrier.add(sill);
+}
+
+for(let i=0;i<PLANT.nGates;i++){
+  const x = gateX0 + GATE_PITCH*(i+0.5);
+  // 피어(교각)
+  if(i<PLANT.nGates){
+    const pier = new THREE.Mesh(new THREE.BoxGeometry(GATE_PITCH-gateWidth, deckY+8, BARRIER_W+1), concrete);
+    pier.position.set(gateX0 + GATE_PITCH*i, (deckY+8)/2-3, BARRIER_Z);
+    pier.castShadow=pier.receiveShadow=true; barrier.add(pier);
+  }
+  // 게이트(강재 판) — Y로 이동
+  const gate = new THREE.Mesh(new THREE.BoxGeometry(gateWidth, 8, 0.9),
+    new THREE.MeshStandardMaterial({ color:0xc23b22, metalness:0.5, roughness:0.5 }));
+  gate.position.set(x, gateShutY, BARRIER_Z - BARRIER_W/2 + 1.5);
+  gate.castShadow=true; barrier.add(gate);
+  // 게이트 보강 리브
+  for(let r=-2;r<=2;r++){
+    const rib = new THREE.Mesh(new THREE.BoxGeometry(gateWidth,0.5,0.2), steelDark);
+    rib.position.set(0, r*1.5, 0.55); gate.add(rib);
+  }
+  // 권양 트러스(상부 도르래 프레임)
+  const frame = new THREE.Mesh(new THREE.BoxGeometry(gateWidth*0.9, 7, 0.6), steel);
+  frame.position.set(x, deckY+4.5, BARRIER_Z - BARRIER_W/2 + 1.5); barrier.add(frame);
+  const motor = new THREE.Mesh(new THREE.BoxGeometry(2.4,1.6,2.4), yellowMat);
+  motor.position.set(x, deckY+8, BARRIER_Z - BARRIER_W/2 + 1.5); motor.castShadow=true; barrier.add(motor);
+
+  // 배수 입자(수문 통한 호소→바다 흐름)
+  const fp = new THREE.BufferGeometry();
+  const N=20; const pos=new Float32Array(N*3); const seed=new Float32Array(N);
+  for(let k=0;k<N;k++){ seed[k]=Math.random();
+    pos[k*3]=x+(Math.random()-0.5)*gateWidth; pos[k*3+1]=-1.5+(Math.random()-0.5)*2; pos[k*3+2]=BARRIER_Z; }
+  fp.setAttribute('position', new THREE.BufferAttribute(pos,3));
+  fp.userData.seed=seed; fp.userData.x=x;
+  const flow = new THREE.Points(fp, new THREE.PointsMaterial({color:0x9fd8ff,size:0.6,transparent:true,opacity:0}));
+  barrier.add(flow);
+
+  gates.push({ gate, flow, x, open:false, pos:0 }); // pos: 0 닫힘 → 1 열림
+}
+
+// 시화나래 전망대(랜드마크) — 수문부 끝
+{
+  const towerBase = new THREE.Mesh(new THREE.CylinderGeometry(3,4,deckY+6,16), concrete);
+  towerBase.position.set(gateX0+GATE_SPAN+6, (deckY+6)/2-3, BARRIER_Z+6); barrier.add(towerBase);
+  const shaft = new THREE.Mesh(new THREE.CylinderGeometry(1.2,1.6,46,14), steel);
+  shaft.position.set(gateX0+GATE_SPAN+6, 26, BARRIER_Z+6); shaft.castShadow=true; barrier.add(shaft);
+  const pod = new THREE.Mesh(new THREE.CylinderGeometry(4.2,3.2,4,16),
+    new THREE.MeshStandardMaterial({color:0x2a4a63, metalness:0.5, roughness:0.3}));
+  pod.position.set(gateX0+GATE_SPAN+6, 50, BARRIER_Z+6); pod.castShadow=true; barrier.add(pod);
+  const top = new THREE.Mesh(new THREE.ConeGeometry(1.2,6,12), steel);
+  top.position.set(gateX0+GATE_SPAN+6, 56, BARRIER_Z+6); barrier.add(top);
+}
+
+// ====================================================================
+//  바다 / 호소 수면 (애니메이션 평면)
+// ====================================================================
+function waterMesh(color, side){
+  const geo = new THREE.PlaneGeometry(1500, 740, 60, 30);
+  const mat = new THREE.MeshStandardMaterial({
+    color, transparent:true, opacity:0.82, roughness:0.18, metalness:0.15 });
+  const m = new THREE.Mesh(geo, mat);
+  m.rotation.x = -Math.PI/2;
+  m.position.z = side * (740/2 + BARRIER_W/2 - 1);
+  m.renderOrder = 2;
+  return m;
+}
+const sea  = waterMesh(0x2f6fb0, -1);   // 바다(−Z)
+const lake = waterMesh(0x1f9e8f, +1);   // 호소(+Z)
+scene.add(sea, lake);
+const seaBase  = sea.geometry.attributes.position.array.slice();
+const lakeBase = lake.geometry.attributes.position.array.slice();
+
+landStrip(-(740 + BARRIER_W/2) - 6, 16, 0x7d7152);
+landStrip(+(740 + BARRIER_W/2) + 6, 16, 0x6f7d4a);
+
+// ====================================================================
+//  시뮬레이션 상태
+// ====================================================================
+const sim = {
+  t: 0,                  // 시뮬 경과시간(시간 단위)
+  seaLevel: PLANT.meanSea,
+  lakeLevel: PLANT.meanSea - 3.0,
+  state: 'WAIT',         // WAIT(축적) / GEN(발전) / SLUICE(배수)
+  powerMW: 0,
+  energyMWh: 0,          // 현재 주기 누적
+  lastCycleMWh: 0,       // 직전 완료 주기 발전량
+  cycleStartT: 0,
+  playing: true,
+  mode: 'manual',
+  // 제어 파라미터
+  startHead: 1.0, stopHead: 0.6, nTurb: 10, nGate: 8, speed: 120,
+};
+const LAKE_AREA = 56.5e6; // 시화호 유효 수면적(㎡) 근사 → 수위변화 물리
+
+// 조석: 바다 수위
+function seaAt(t){
+  return PLANT.meanSea + PLANT.tidalAmp * Math.sin(2*Math.PI*t/PLANT.periodHr);
+}
+// 터빈 1기 통수량(㎥/s) — 낙차 함수, 정격 제한
+function turbFlow(head){
+  if(head<=0) return 0;
+  const q = 130 * Math.sqrt(head);          // √H 비례(오리피스)
+  return Math.min(q, 480);                   // 정격 통수 한계
+}
+// 터빈 1기 출력(MW)
+function turbPowerMW(head){
+  if(head<=0) return 0;
+  const q = turbFlow(head);
+  const p = PLANT.effGen * 1000 * 9.81 * q * head / 1e6; // MW
+  return Math.min(p, PLANT.ratedMW);
+}
+// 수문 1문 배수량(㎥/s) — 역낙차(호소>바다)
+function gateFlow(revHead){
+  if(revHead<=0) return 0;
+  return 320 * Math.sqrt(revHead);
+}
+
+// ====================================================================
+//  UI 바인딩
+// ====================================================================
+function bindSlider(id, valId, fmt, key, after){
+  const el=$(id), v=$(valId);
+  const upd=()=>{ const val=parseFloat(el.value); sim[key]=val; v.textContent=fmt(val); after&&after(val); };
+  el.addEventListener('input', ()=>{ if(sim.mode==='ai'){ setMode('manual'); } upd(); });
+  upd();
+}
+bindSlider('sStart','vStart',v=>v.toFixed(1)+' m','startHead');
+bindSlider('sStop','vStop',v=>v.toFixed(1)+' m','stopHead');
+bindSlider('sTurb','vTurb',v=>v+'기','nTurb');
+bindSlider('sGate','vGate',v=>v+'문','nGate');
+bindSlider('sSpeed','vSpeed',v=>v+'×','speed');
+
+function setMode(m){
+  sim.mode = m;
+  $('mManual').classList.toggle('on', m==='manual');
+  $('mAI').classList.toggle('on', m==='ai');
+  if(m==='ai'){
+    // AI 최적 운전: 단류식 발전량 최대화 튜닝값
+    setSlider('sStart','vStart',1.7,v=>v.toFixed(1)+' m','startHead');
+    setSlider('sStop','vStop',0.8,v=>v.toFixed(1)+' m','stopHead');
+    setSlider('sTurb','vTurb',10,v=>v+'기','nTurb');
+    setSlider('sGate','vGate',8,v=>v+'문','nGate');
+  }
+}
+function setSlider(id,valId,val,fmt,key){
+  $(id).value=val; $(valId).textContent=fmt(val); sim[key]=val;
+}
+$('mManual').onclick=()=>setMode('manual');
+$('mAI').onclick=()=>setMode('ai');
+$('bPlay').onclick=()=>{ sim.playing=!sim.playing; $('bPlay').textContent = sim.playing?'⏸ 일시정지':'▶ 재생'; };
+$('bReset').onclick=()=>{ sim.t=0; sim.lakeLevel=PLANT.meanSea-3.0; sim.state='WAIT';
+  sim.energyMWh=0; sim.lastCycleMWh=0; sim.cycleStartT=0; };
+$('bCam').onclick=()=>{ camIdx=(camIdx+1)%camViews.length; applyView(camIdx); };
+
+// ====================================================================
+//  메인 루프
+// ====================================================================
+let prev = performance.now();
+function tick(now){
+  const dtReal = Math.min((now-prev)/1000, 0.05); prev = now;
+  controls.update();
+
+  if(sim.playing){
+    const dtHr = dtReal * sim.speed / 3600;   // 시뮬 시간(시간)
+    stepPhysics(dtHr);
+  }
+  animateScene(now*0.001);
+  updateCamera(dtReal);
+  updateHUD();
+  renderer.render(scene, camera);
+  requestAnimationFrame(tick);
+}
+
+function stepPhysics(dtHr){
+  sim.t += dtHr;
+  sim.seaLevel = seaAt(sim.t);
+  const dtSec = dtHr*3600;
+
+  const head = sim.seaLevel - sim.lakeLevel;       // 정낙차(바다>호소): 발전
+  const revHead = sim.lakeLevel - sim.seaLevel;    // 역낙차(호소>바다): 배수
+  const seaRising = Math.cos(2*Math.PI*sim.t/PLANT.periodHr) > 0;
+
+  // --- 상태 전이 (단류식 창조발전 사이클) ---
+  if(sim.state==='WAIT'){
+    // 수문 닫고 바다 상승 대기 → 개시낙차 도달 & 밀물이면 발전
+    if(seaRising && head >= sim.startHead) sim.state='GEN';
+    // 만조 지나 바다 하강 + 역낙차면 배수로
+    else if(!seaRising && revHead > 0.15) sim.state='SLUICE';
+  } else if(sim.state==='GEN'){
+    if(head < sim.stopHead || !seaRising && head < sim.startHead*0.6) sim.state='WAIT_HIGH';
+  } else if(sim.state==='WAIT_HIGH'){
+    // 만조 부근 정체 → 바다 하강하여 역낙차 발생 시 배수
+    if(!seaRising && revHead > 0.1) sim.state='SLUICE';
+  } else if(sim.state==='SLUICE'){
+    // 호소를 바다 저조위까지 배수 → 다시 대기(다음 발전 준비)
+    if(revHead <= 0.05 || (seaRising && head>0)) sim.state='WAIT';
+  }
+
+  // --- 게이트 목표 위치 ---
+  const wantOpen = (sim.state==='SLUICE');
+  gates.forEach((g,i)=>{ g.open = wantOpen && i<sim.nGate; });
+
+  // --- 발전 ---
+  sim.powerMW = 0;
+  let qIn = 0; // 호소 유입량(㎥/s)
+  if(sim.state==='GEN' && head>0){
+    const p1 = turbPowerMW(head), q1 = turbFlow(head);
+    const n = sim.nTurb;
+    sim.powerMW = p1 * n;
+    qIn = q1 * n;
+    sim.energyMWh += sim.powerMW * (dtHr);    // MW × h
+    turbines.forEach((tb,i)=> tb.on = i<n);
+  } else {
+    turbines.forEach(tb=> tb.on=false);
+  }
+
+  // --- 배수(수문) ---
+  let qOut = 0;
+  if(sim.state==='SLUICE' && revHead>0){
+    qOut = gateFlow(revHead) * sim.nGate;
+  }
+
+  // --- 호소 수위 변화 (체적 수지) ---
+  const dV = (qIn - qOut) * dtSec;           // ㎥
+  sim.lakeLevel += dV / LAKE_AREA;
+  // 물리 한계
+  sim.lakeLevel = Math.max(PLANT.meanSea-4.2, Math.min(sim.lakeLevel, PLANT.meanSea+PLANT.tidalAmp+0.5));
+
+  // --- 주기 완료 감지(발전 종료→배수 시작 시 직전 발전량 기록) ---
+  if(sim.state==='SLUICE' && sim.energyMWh>0 && sim._prevState!=='SLUICE'){
+    sim.lastCycleMWh = sim.energyMWh;
+    sim.energyMWh = 0;
+  }
+  sim._prevState = sim.state;
+}
+
+// ---- 장면 애니메이션 ----
+function animateScene(t){
+  // 수면 높이/파동
+  updateWater(sea, seaBase, sim.seaLevel, t);
+  updateWater(lake, lakeBase, sim.lakeLevel, t*0.8);
+  // 터빈 회전 + 통수 입자
+  const head = Math.max(sim.seaLevel - sim.lakeLevel, 0);
+  const spin = sim.state==='GEN' ? (0.4 + head*0.16) : 0;
+  turbines.forEach(tb=>{
+    if(tb.on) tb.runner.rotation.z += spin;
+    const op = tb.on ? 0.9 : 0.0;
+    tb.flow.material.opacity += (op - tb.flow.material.opacity)*0.1;
+    if(tb.on) advectFlow(tb.flow, +1, 0.6+head*0.25, sim.lakeLevel);
+  });
+  // 게이트 이동 + 배수 입자
+  gates.forEach(g=>{
+    g.pos += ((g.open?1:0) - g.pos)*0.06;
+    g.gate.position.y = gateShutY + (gateOpenY-gateShutY)*g.pos;
+    const flowing = g.open && sim.state==='SLUICE';
+    const op = flowing?0.85:0;
+    g.flow.material.opacity += (op - g.flow.material.opacity)*0.1;
+    if(flowing) advectFlow(g.flow, -1, 0.7, sim.seaLevel);
+  });
+}
+
+function updateWater(mesh, base, level, t){
+  const p = mesh.geometry.attributes.position.array;
+  for(let i=0;i<p.length;i+=3){
+    const x=base[i], z=base[i+1];
+    p[i+2] = base[i+2] + Math.sin(x*0.03+t)*0.25 + Math.cos(z*0.04+t*1.3)*0.25;
+  }
+  mesh.geometry.attributes.position.needsUpdate = true;
+  mesh.position.y = level;
+}
+
+function advectFlow(flow, dir, speed, dstLevel){
+  const pos = flow.geometry.attributes.position.array;
+  const seed = flow.geometry.userData.seed;
+  const x0 = flow.geometry.userData.x;
+  const N = seed.length;
+  for(let k=0;k<N;k++){
+    pos[k*3+2] += dir*speed;
+    const limit = BARRIER_W/2 + 8;
+    if(dir>0 && pos[k*3+2] > limit){ pos[k*3+2] = -BARRIER_W/2; pos[k*3]=x0+(Math.random()-0.5)*2.4; pos[k*3+1]=1.0+(Math.random()-0.5)*2.2; }
+    if(dir<0 && pos[k*3+2] < -limit){ pos[k*3+2] = BARRIER_W/2; pos[k*3]=x0+(Math.random()-0.5)*3; pos[k*3+1]=-1.5+(Math.random()-0.5)*2; }
+  }
+  flow.geometry.attributes.position.needsUpdate = true;
+}
+
+function updateCamera(dt){
+  if(camAnim>0){
+    camera.position.lerp(camGoal, 0.06);
+    camAnim -= dt*0.4;
+    if(camera.position.distanceTo(camGoal)<1.5) camAnim=0;
+  }
+  controls.target.lerp(camTarget, 0.06);
+}
+
+// ---- HUD 업데이트 ----
+const stateInfo = {
+  WAIT:      {t:'① 낙차 축적 (수문 닫힘)', c:'rgba(117,117,117,0.35)'},
+  GEN:       {t:'② 발전 중 — 바다→호소 통수', c:'rgba(45,106,45,0.55)'},
+  WAIT_HIGH: {t:'③ 만조 정체 (발전 종료)', c:'rgba(166,4,55,0.40)'},
+  SLUICE:    {t:'④ 배수 중 — 수문 개방', c:'rgba(14,124,123,0.55)'},
+};
+function updateHUD(){
+  const head = sim.seaLevel - sim.lakeLevel;
+  ui.power.innerHTML = sim.powerMW.toFixed(0)+'<small> MW</small>';
+  ui.powerbar.style.width = Math.min(100, sim.powerMW/254*100)+'%';
+  ui.seaLv.textContent = sim.seaLevel.toFixed(2);
+  ui.lakeLv.textContent = sim.lakeLevel.toFixed(2);
+  ui.head.textContent = head.toFixed(2);
+  ui.nturb.textContent = (sim.state==='GEN'? sim.nTurb : 0);
+  ui.energy.textContent = sim.energyMWh.toFixed(1);
+  const hh=Math.floor(sim.t%24), mm=Math.floor((sim.t*60)%60);
+  ui.clock.textContent = String(hh).padStart(2,'0')+':'+String(mm).padStart(2,'0');
+  const s = stateInfo[sim.state]||stateInfo.WAIT;
+  ui.state.textContent = s.t; ui.state.style.background = s.c;
+
+  // 성과 환산(직전 완료 주기 기준, 하루 약 1.93 주기)
+  const cyc = sim.lastCycleMWh;
+  ui.cCycle.textContent = cyc.toFixed(0);
+  const perDay = cyc*1.932;                  // GWh 환산
+  ui.cDay.textContent = (perDay/1000).toFixed(2);
+  const perYear = perDay*365/1000;           // GWh
+  ui.cYear.textContent = perYear.toFixed(0);
+  ui.cPct.textContent = (perYear/552.7*100).toFixed(0);
+}
+
+addEventListener('resize', ()=>{
+  camera.aspect = innerWidth/innerHeight; camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight);
+});
+
+// 시작
+$('loading').style.display='none';
+requestAnimationFrame(tick);
+</script>
+</body>
+</html>
