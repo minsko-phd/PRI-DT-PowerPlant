@@ -307,7 +307,7 @@ function evalEnergy(startHead, amp){
   const cyc = [];
   for(let i=0;i<steps;i++){ const d=integrate(s,p,dt); if(d>0) cyc.push(d); }
   const use = cyc.slice(1);
-  return use.length ? use.reduce((a,b)=>a+b,0)/use.length : (cyc[0]||0);
+  return use.length>=1 ? use.reduce((a,b)=>a+b,0)/use.length : 0; // 정상상태 주기 없으면 0(저개시 붕괴)
 }
 function runSweep(amp){
   const pts=[]; let best=0,bestSh=1.0;
