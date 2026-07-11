@@ -40,8 +40,9 @@ python3 -m http.server 8080     # 레포 루트에서
 | `scene6_night_closeup.png` | 야간 임팩트 컷 | p.5 · 표지/클로징 |
 | `scene7_agent_console.png` | Agent 콘솔 — 조력발전과 정비일정 | p.8 Scene④ |
 | `scene8_agent_thermal.png` | Agent 콘솔 — 열화상(전기계측점검과) | 유첨 8 |
-| `scene9_cctv_wall.png` | CCTV 실사 4채널 월 | p.4 ④ |
-| `scene10_cctv_event.png` | AI 객체감지 + PR-01 출동 | p.4 ④ |
+| `scene9_cctv_wall.png` | CCTV 실사 16채널 월 | p.4 ④ |
+| `scene10_cctv_person.png` | 사람 감지 → 안전 Agent 대응 | p.4 ④ · p.8 |
+| `scene14_cctv_ship.png` | 작업선 감지 → 운영 Agent 배수 보류 | p.4 ④ · p.8 |
 | `scene11_vts_lift.png` | VTS — 러너(510ton) 크레인 인양 | p.7 Scene③ |
 | `scene12_vts_disasm.png` | VTS — 정비 베이 분해·블레이드 배열 | p.7 Scene③ |
 | `scene13_vts_eval.png` | VTS — 훈련 평가 (절차 100%·20일→8일) | p.7 Scene③ |
@@ -54,7 +55,7 @@ python3 -m http.server 8080     # 레포 루트에서
 - **데이터 레이크(L2)**: 수집 게이트웨이 tag/s(유량 연동 실계산) · 시계열 DB · KKS 문서 · SmartFLO 영상 · 스파크라인
 - **발전량 최적화**: 개시낙차 스윕(메모이즈) → 최적 2.8m · 연 552GWh 100%
 - **VC 인터록**: MCC 시퀀스(Standstill→Turbine→Line→Reverse) 6케이스 + 위반 주입 차단
-- **CCTV 실사 월**: K-water 시화호 실촬영 4채널(방조제·항공·수문부·달전망대, Wikimedia Commons) + AI 객체 박스(선박 91%) → PR-01 3D 로봇 출동 → 종결
+- **CCTV 실사 월 16채널**: 시화조력 실사 16채널(전경·발전기실·수문·제방도로·중앙제어실·수차실 등, 현장 구성안 이미지 기반). CH-10·CH-14는 실영상(WebM/MP4) 재생. **2단계 Agent 자동 대응 시나리오**: ① CH-10 사람 감지(94%) → **안전 Agent** 작업허가 대조(미등록) → 현장 경고 방송 → PR-01 출동 → 안전지대 유도·종결 ② CH-14 작업선 감지(91%) → **운영 Agent** 수문 배수 시퀀스 보류(실제 인터록 연동 — 보류 중 수문 개방 요청은 차단됨) → VHF ch.16 안내 → 접안 완료 시 보류 해제
 - **AI Agent 콘솔 6종**: 5개 과+공통 — 정비일정/고장이력/재정/발주·위험성평가/공람·사진대지/회의록 STT/점검일정/열화상/전표 OCR/공람 리스크 (EXAONE·HITL 배지)
 - **VTS 분해점검 훈련**: 준비·인터록→해치→인양(510ton)→운반→분해(블레이드4·노즈콘)→베어링 교체(마모 0.42㎜)→재조립→복귀→시운전·평가(절차 100%, 20일→8일 ▽60%). 러너는 실물 CAD 기반 벌브 수차(연녹 발전기 벌브·플랜지·브래킷). 훈련 중 T7 자동 격리(9기 운전)
 - **예지보전→자율 루프(8단계)**: 트윈 검증은 물리모델 실계산(A안 vs B안 −1.44GWh ≈ PPT 1.5GWh/일), HITL 승인, KKS 이력, 재학습
@@ -74,7 +75,8 @@ python3 -m http.server 8080     # 레포 루트에서
 | `sihwa_best_vs_worst_v2.mp4` | BEST(AI 2.8m) vs WORST(0.6m) 38s | p.6 Scene② |
 | `sihwa_agent_loop_v2.mp4` | 이상→8단계 루프→HITL→9기 운전 29s | p.12~14 |
 | `sihwa_cinematic_v2.mp4` | 주간→야간 시네마틱 20s | 표지·클로징 |
-| `sihwa_vts_v2.mp4` | VTS 분해점검 전 과정 (재렌더 예정) | p.7 Scene③ |
+| `sihwa_vts_v2.mp4` | VTS 분해점검 전 과정 57s | p.7 Scene③ |
+| `sihwa_cctv_agent_v2.mp4` | CCTV 16채널 — 사람·선박 감지 Agent 대응 38s | p.4 ④ · p.8 |
 
 ※ v2 영상 3편은 이전 전달분 사용(구 왜곡 로고 영상 대체본). VTS 영상은 별도 전달.
 

@@ -202,16 +202,19 @@
   /* ── CCTV 통합 감시 — 실사 VMS 월 (2×2) ── */
   #cctv{position:fixed;inset:0;z-index:14;display:none;background:#05090e;padding:60px 16px 44px;}
   #cctv.show{display:block;}
-  .vmsGrid{display:grid;grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr;gap:8px;height:100%;}
+  .vmsGrid{display:grid;grid-template-columns:repeat(4,1fr);grid-template-rows:repeat(4,1fr);gap:5px;height:100%;}
   .vmsTile{position:relative;border:1px solid rgba(255,255,255,0.14);border-radius:4px;overflow:hidden;
     background-size:cover;background-position:center;}
   .vmsTile:after{content:"";position:absolute;inset:0;pointer-events:none;
     background:repeating-linear-gradient(0deg,rgba(0,0,0,0.09) 0 1px,transparent 1px 3px),
       radial-gradient(ellipse at center,transparent 55%,rgba(0,10,20,0.42) 100%);}
   .vmsTile .img{position:absolute;inset:0;background-size:cover;background-position:center;
-    filter:saturate(0.82) contrast(1.05) brightness(0.96);animation:vmsPan 26s ease-in-out infinite alternate;}
-  .vmsTile:nth-child(2) .img{animation-duration:31s;} .vmsTile:nth-child(3) .img{animation-duration:23s;}
-  .vmsTile:nth-child(4) .img{animation-duration:35s;}
+    filter:saturate(0.88) contrast(1.04);animation:vmsPan 26s ease-in-out infinite alternate;}
+  .vmsTile:nth-child(4n+2) .img{animation-duration:31s;} .vmsTile:nth-child(4n+3) .img{animation-duration:23s;}
+  .vmsTile:nth-child(4n) .img{animation-duration:35s;} .vmsTile:nth-child(4n+1) .img{animation-duration:28s;}
+  .vmsTile video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;}
+  .vmsLive{position:absolute;z-index:3;top:6px;left:8px;font-size:8.5px;font-weight:800;color:#7CFC9B;
+    background:rgba(0,0,0,0.55);border:1px solid rgba(124,252,155,0.45);border-radius:2px;padding:1px 5px;letter-spacing:1px;}
   @keyframes vmsPan{from{transform:scale(1.02) translate(0,0);}to{transform:scale(1.12) translate(-1.6%,1.2%);}}
   .vmsHead{position:absolute;top:0;left:0;right:0;z-index:2;display:flex;align-items:center;gap:8px;
     padding:6px 10px;background:linear-gradient(180deg,rgba(0,0,0,0.62),transparent);
@@ -222,7 +225,7 @@
     background:linear-gradient(0deg,rgba(0,0,0,0.55),transparent);display:flex;justify-content:space-between;}
   .vmsTile.alert{border:2px solid var(--danger);box-shadow:0 0 0 1px rgba(224,49,49,0.4),0 0 22px rgba(224,49,49,0.35) inset;}
   .vmsTile.alert .vmsHead{background:linear-gradient(180deg,rgba(140,10,10,0.72),transparent);}
-  .vmsBadge{position:absolute;z-index:3;top:34px;left:10px;display:none;background:rgba(224,49,49,0.92);
+  .vmsBadge{position:absolute;z-index:4;bottom:30px;left:8px;display:none;background:rgba(224,49,49,0.92);
     color:#fff;font-size:10.5px;font-weight:800;border-radius:3px;padding:4px 9px;letter-spacing:-0.2px;}
   .vmsBadge.ok{background:rgba(45,106,45,0.92);}
   .vmsTile.alert .vmsBadge{display:block;}
@@ -530,22 +533,48 @@
 <div id="cctv">
   <button id="cctvExit">CCTV 종료 (ESC)</button>
   <div class="vmsGrid">
-    <div class="vmsTile" id="vt0"><div class="img" style="background-image:url('./vendor/cctv/cam1_seawall.jpg')"></div>
-      <div class="vmsHead"><i class="rec">●</i>CAM-01 · 방조제 동측 <span class="ts" id="ts0"></span></div>
-      <div class="vmsFoot"><span>1920×1080 · 30fps</span><span>AI 분석 ON</span></div></div>
-    <div class="vmsTile" id="vt1"><div class="img" style="background-image:url('./vendor/cctv/cam2_plant.jpg')"></div>
-      <div class="vmsHead"><i class="rec">●</i>CAM-02 · 발전소 전경 (항공) <span class="ts" id="ts1"></span></div>
-      <div class="vmsFoot"><span>1920×1080 · 30fps</span><span>AI 분석 ON</span></div></div>
-    <div class="vmsTile" id="vt2"><div class="img" style="background-image:url('./vendor/cctv/cam3_sluice.jpg')"></div>
-      <div class="vmsHead"><i class="rec">●</i>CAM-03 · 수문부(갑문) 협소구역 <span class="ts" id="ts2"></span></div>
-      <div class="vmsBadge" id="vb2">접근 감지 — PR-01 출동</div>
-      <div class="vmsAI" id="va2" style="left:58%;top:46%;width:15%;height:26%"><em>객체: 선박 · 신뢰도 91%</em></div>
-      <div class="vmsFoot"><span>1920×1080 · 30fps</span><span>AI 분석 ON</span></div></div>
-    <div class="vmsTile" id="vt3"><div class="img" style="background-image:url('./vendor/cctv/cam4_tower.jpg')"></div>
-      <div class="vmsHead"><i class="rec">●</i>CAM-04 · 달전망대·문화관 <span class="ts" id="ts3"></span></div>
-      <div class="vmsFoot"><span>1920×1080 · 30fps</span><span>AI 분석 ON</span></div></div>
+    <div class="vmsTile" id="vt0"><div class="img" style="background-image:url('./vendor/cctv/grid/ch01.jpg')"></div>
+      <div class="vmsFoot"><span>CH-01</span><span>AI 분석 ON</span></div></div>
+    <div class="vmsTile" id="vt1"><div class="img" style="background-image:url('./vendor/cctv/grid/ch02.jpg')"></div>
+      <div class="vmsFoot"><span>CH-02</span><span>AI 분석 ON</span></div></div>
+    <div class="vmsTile" id="vt2"><div class="img" style="background-image:url('./vendor/cctv/grid/ch03.jpg')"></div>
+      <div class="vmsFoot"><span>CH-03</span><span>AI 분석 ON</span></div></div>
+    <div class="vmsTile" id="vt3"><div class="img" style="background-image:url('./vendor/cctv/grid/ch04.jpg')"></div>
+      <div class="vmsFoot"><span>CH-04</span><span>AI 분석 ON</span></div></div>
+    <div class="vmsTile" id="vt4"><div class="img" style="background-image:url('./vendor/cctv/grid/ch05.jpg')"></div>
+      <div class="vmsFoot"><span>CH-05</span><span>AI 분석 ON</span></div></div>
+    <div class="vmsTile" id="vt5"><div class="img" style="background-image:url('./vendor/cctv/grid/ch06.jpg')"></div>
+      <div class="vmsFoot"><span>CH-06</span><span>AI 분석 ON</span></div></div>
+    <div class="vmsTile" id="vt6"><div class="img" style="background-image:url('./vendor/cctv/grid/ch07.jpg')"></div>
+      <div class="vmsFoot"><span>CH-07</span><span>AI 분석 ON</span></div></div>
+    <div class="vmsTile" id="vt7"><div class="img" style="background-image:url('./vendor/cctv/grid/ch08.jpg')"></div>
+      <div class="vmsFoot"><span>CH-08</span><span>AI 분석 ON</span></div></div>
+    <div class="vmsTile" id="vt8"><div class="img" style="background-image:url('./vendor/cctv/grid/ch09.jpg')"></div>
+      <div class="vmsFoot"><span>CH-09</span><span>AI 분석 ON</span></div></div>
+    <div class="vmsTile" id="vt9">
+      <video autoplay muted loop playsinline poster="./vendor/cctv/grid/ch10.jpg"><source src="./vendor/cctv/grid/ch10.webm" type="video/webm"><source src="./vendor/cctv/grid/ch10.mp4" type="video/mp4"></video>
+      <span class="vmsLive">LIVE</span>
+      <div class="vmsBadge" id="vbPerson">사람 감지 — 안전 Agent 대응</div>
+      <div class="vmsAI" id="vaPerson" style="left:41%;top:14%;width:19%;height:66%"><em>객체: 사람 · 신뢰도 94%</em></div>
+      <div class="vmsFoot"><span>CH-10</span><span>AI 분석 ON</span></div></div>
+    <div class="vmsTile" id="vt10"><div class="img" style="background-image:url('./vendor/cctv/grid/ch11.jpg')"></div>
+      <div class="vmsFoot"><span>CH-11</span><span>AI 분석 ON</span></div></div>
+    <div class="vmsTile" id="vt11"><div class="img" style="background-image:url('./vendor/cctv/grid/ch12.jpg')"></div>
+      <div class="vmsFoot"><span>CH-12</span><span>AI 분석 ON</span></div></div>
+    <div class="vmsTile" id="vt12"><div class="img" style="background-image:url('./vendor/cctv/grid/ch13.jpg')"></div>
+      <div class="vmsFoot"><span>CH-13</span><span>AI 분석 ON</span></div></div>
+    <div class="vmsTile" id="vt13">
+      <video autoplay muted loop playsinline poster="./vendor/cctv/grid/ch14.jpg"><source src="./vendor/cctv/grid/ch14.webm" type="video/webm"><source src="./vendor/cctv/grid/ch14.mp4" type="video/mp4"></video>
+      <span class="vmsLive">LIVE</span>
+      <div class="vmsBadge" id="vbShip">작업선 감지 — 운영 Agent 대응</div>
+      <div class="vmsAI" id="vaShip" style="left:26%;top:26%;width:48%;height:52%"><em>객체: 작업선 · 신뢰도 91%</em></div>
+      <div class="vmsFoot"><span>CH-14</span><span>AI 분석 ON</span></div></div>
+    <div class="vmsTile" id="vt14"><div class="img" style="background-image:url('./vendor/cctv/grid/ch15.jpg')"></div>
+      <div class="vmsFoot"><span>CH-15</span><span>AI 분석 ON</span></div></div>
+    <div class="vmsTile" id="vt15"><div class="img" style="background-image:url('./vendor/cctv/grid/ch16.jpg')"></div>
+      <div class="vmsFoot"><span>CH-16</span><span>AI 분석 ON</span></div></div>
   </div>
-  <div class="cctvBR">패트롤 로봇 <b>PR-01</b> <span id="prState">방조제 순찰 중</span> · 배터리 <span id="prBatt">82%</span> · 영상: K-water 시화호 실촬영(Wikimedia Commons)</div>
+  <div class="cctvBR">시화조력 통합 CCTV 16채널 · 패트롤 로봇 <b>PR-01</b> <span id="prState">방조제 순찰 중</span> · 배터리 <span id="prBatt">82%</span> · AI 객체분석: 사람·선박·차량</div>
 </div>
 
 <!-- VTS 가상훈련 — 수차 분해점검 (PPT Scene③ · '27 최초 분해점검 대비) -->
@@ -1302,7 +1331,7 @@ const vtsRig = {};
 //  PPT 매핑: 본다(DOS) / 검증한다(VC) / 기억한다(이력→지식화) / 판단한다(8단계 루프+HITL)
 // ====================================================================
 P.nOff=0;
-const pdm={ offline:new Set(), alarm:new Set(), fault:null, acc:97.2, lossA:0, lossB:0 };
+const pdm={ offline:new Set(), alarm:new Set(), fault:null, acc:97.2, lossA:0, lossB:0, secAlert:false, gateHold:false };
 // 위기경보 색: 정상=#5FB351(K-water 그린) · 주의=#FF9933(K-water 오렌지) · 경계=#F2701A(오렌지 명도 파생) · 심각=#E03131(표준 알람)
 const CRISIS=['관심','주의','경계','심각'], CRISIS_C=['#5FB351','#FF9933','#F2701A','#E03131'];
 
@@ -1339,15 +1368,17 @@ function dosTick(dt){
   if(pdm.alarm.size) lv=Math.max(lv,1);
   $('dFld').textContent=CRISIS[lv];
   $('crisisLv').textContent=CRISIS[lv]; $('crisisLv').style.color=CRISIS_C[lv];
-  $('dSaf').textContent=pdm.offline.size?'정비작업 1건 (허가)':'작업 0건';
+  $('dSaf').textContent=pdm.secAlert?'미등록 접근 1건':(pdm.offline.size?'정비작업 1건 (허가)':'작업 0건');
   $('dLed0').className='led ok';
   $('dLed1').className='led ok';
   $('dLed2').className='led '+(lv===0?'ok':lv===1?'warn':'bad');
-  $('dLed3').className='led '+(pdm.alarm.size?'bad':pdm.offline.size?'warn':'ok');
+  $('dLed3').className='led '+((pdm.alarm.size||pdm.secAlert)?'bad':pdm.offline.size?'warn':'ok');
   $('shadowPct').textContent=(99.0+0.35*Math.sin(sim.t*0.7)).toFixed(1)+'%';
   // 전역 발전소 상태 필 (3초 파악용)
   const ps=$('plantStatus');
-  if(pdm.alarm.size){ ps.className='ps bad'; ps.textContent='이상 감지 · T7 점검'; }
+  if(pdm.secAlert){ ps.className='ps bad'; ps.textContent='보안 경보 · CH-10 대응 중'; }
+  else if(pdm.gateHold){ ps.className='ps warn'; ps.textContent='배수 보류 · 선박 접안 중'; }
+  else if(pdm.alarm.size){ ps.className='ps bad'; ps.textContent='이상 감지 · T7 점검'; }
   else if(pdm.offline.size){ ps.className='ps warn'; ps.textContent='계획 정비 중 · 9기 운전'; }
   else if(lv>=2){ ps.className='ps bad'; ps.textContent='위기경보 '+CRISIS[lv]; }
   else if(lv===1){ ps.className='ps warn'; ps.textContent='위기경보 주의'; }
@@ -1483,7 +1514,8 @@ $('bReject').onclick=()=>{
 $('bFault').onclick=injectFault;
 
 // ---------- VC 인터록 — MCC 시퀀스 사전 검증 (검증한다) ----------
-function guard(action,st){
+function guard(action,st,live){
+  if(live && action==='OPEN_GATE' && pdm.gateHold) return '선박 접안 중 — 운영 Agent 배수 보류';
   if(action==='OPEN_GATE'  && st==='GEN')       return '발전 중 수문 개방 금지 — 역류·수격 위험';
   if(action==='OPEN_GATE'  && st==='WAIT')      return '낙차 축적 중 개방 금지 — 발전 기회 상실';
   if(action==='START_TURB' && st==='SLUICE')    return '배수 중 터빈 기동 금지 — 무낙차 공회전';
@@ -1511,7 +1543,7 @@ $('bVC').onclick=()=>{
   banner('VC 시퀀스 검증: '+nPass+'/'+VC_CASES.length+' PASS','제어 로직을 가동 전 트윈에서 사전 검증','ok',3800);
 };
 $('bViol').onclick=()=>{
-  const r=guard('OPEN_GATE',sim.state);
+  const r=guard('OPEN_GATE',sim.state,true);
   if(r){ banner('인터록 차단: 수문 개방 거부',r+' · MCC 시퀀스 위반','block',5200);
          logOps('VC','수문 개방 요청 차단 — '+r,'bad'); }
   else { banner('인터록 통과: 수문 개방 허용','현재 상태('+sim.state+') 시퀀스 적합','ok',3800);
@@ -1623,11 +1655,14 @@ function setCCTV(on){
   if(on){
     if(tour) setTour(false);
     cctvT=0; cctvEvent=0;
-    $('vt2').classList.remove('alert'); $('va2').style.display='none';
-    $('vb2').classList.remove('ok'); $('vb2').textContent='접근 감지 — PR-01 출동';
-    banner('CCTV 통합 감시 개시','방조제 전역 4채널 실영상 · AI 객체분석 · 패트롤 로봇 PR-01 연동','info',3500);
-    logOps('CCTV','통합 감시 모드 — 4채널 + PR-01 순찰','');
-  } else { robotTarget=null; robotSpeed=3.2; $('prState').textContent='방조제 순찰 중'; }
+    ['vt9','vt13'].forEach(id=>$(id).classList.remove('alert'));
+    $('vaPerson').style.display='none'; $('vaShip').style.display='none';
+    $('vbPerson').className='vmsBadge'; $('vbPerson').textContent='사람 감지 — 안전 Agent 대응';
+    $('vbShip').className='vmsBadge'; $('vbShip').textContent='작업선 감지 — 운영 Agent 대응';
+    banner('CCTV 통합 감시 개시','시화조력 16채널 실영상 · AI 객체분석(사람·선박) · Agent 자동 대응 · PR-01 연동','info',3800);
+    logOps('CCTV','통합 감시 모드 — 16채널 + AI 객체분석 + PR-01','');
+  } else { robotTarget=null; robotSpeed=3.2; $('prState').textContent='방조제 순찰 중';
+           pdm.secAlert=false; pdm.gateHold=false; }
 }
 $('bCCTV').onclick=()=>setCCTV(!cctvOn);
 $('cctvExit').onclick=()=>setCCTV(false);
@@ -1635,25 +1670,43 @@ addEventListener('keydown',e=>{ if(e.key==='Escape'&&cctvOn) setCCTV(false); });
 function cctvTick(d){
   if(!cctvOn) return;
   cctvT+=d;
-  const dd=Math.floor(sim.t/24),hh=Math.floor(sim.t%24),mm2=Math.floor(sim.t*60%60),ss=Math.floor(sim.t*3600%60);
-  const ts=`D${dd} ${String(hh).padStart(2,'0')}:${String(mm2).padStart(2,'0')}:${String(ss).padStart(2,'0')}`;
-  for(let i=0;i<4;i++){ const el=$('ts'+i); if(el) el.textContent=ts; }
-  if(cctvEvent===0 && cctvT>8){
-    cctvEvent=1;
-    $('vt2').classList.add('alert'); $('va2').style.display='block';
-    banner('접근 감지: 수문부 협소구역 (CAM-03)','AI 객체분석 — 선박 접근 추정 (신뢰도 91%) · PR-01 출동','warn',5000);
-    logOps('CCTV','CAM-03 접근 감지 (AI 신뢰도 91%) — PR-01 출동 지시','warn');
-    robotTarget=gateX0+GATE_SPAN*0.55; robotSpeed=11; $('prState').textContent='출동 중 — 수문부 협소구역';
+  // ── 이벤트 1: 사람 감지 (CH-10 방조제) → 안전 Agent 자동 대응 ──
+  if(cctvEvent===0 && cctvT>5){
+    cctvEvent=1; pdm.secAlert=true;
+    $('vt9').classList.add('alert'); $('vaPerson').style.display='block';
+    banner('사람 감지: 방조제 난간 (CH-10)','안전 Agent — 금일 작업허가 12건 대조: 미등록 인원 → 현장 경고 방송 · PR-01 출동','warn',6000);
+    logOps('안전Agent','CH-10 사람 감지 (신뢰도 94%) — 작업허가 대조: 미등록','warn');
+    robotTarget=turbX0+TURB_SPAN*0.3; robotSpeed=11; $('prState').textContent='출동 중 — CH-10 방조제';
   }
-  if(cctvEvent===1 && robotTarget!==null && Math.abs(robot.position.x-robotTarget)<2){
+  if(cctvEvent===1 && cctvT>9){
     cctvEvent=2;
-    $('vb2').classList.add('ok'); $('vb2').textContent='현장 확인 — 상황 종결';
-    $('va2').style.display='none';
-    banner('현장 확인 완료: 조업 어선 (안전거리 이탈 없음)','PR-01 현장 영상 전송 · 상황 종결 — 이력 기록','ok',4600);
-    logOps('CCTV','PR-01 현장 확인 — 상황 종결·이력 기록','good');
+    logOps('안전Agent','현장 경고 방송 실시 — "안전지대로 이동하십시오"','');
+  }
+  if(cctvEvent===2 && robotTarget!==null && Math.abs(robot.position.x-robotTarget)<2){
+    cctvEvent=3; pdm.secAlert=false;
+    $('vbPerson').classList.add('ok'); $('vbPerson').textContent='조치 완료 — 안전지대 유도';
+    $('vaPerson').style.display='none';
+    banner('안전 조치 완료: 안전지대 유도 · 작업허가 안내 (CH-10)','PR-01 현장 확인 · 안전 Agent 종결 — 이력 기록','ok',4800);
+    logOps('안전Agent','PR-01 현장 조치 완료 — 안전교육 안내·이력 기록','good');
     robotTarget=null; robotSpeed=3.2; $('prState').textContent='순찰 복귀';
   }
-  if(cctvEvent===2 && cctvT>22){ $('vt2').classList.remove('alert'); }
+  // ── 이벤트 2: 선박 감지 (CH-14 접안장) → 운영 Agent 자동 대응 (배수 보류 = 실제 인터록 연동) ──
+  if(cctvEvent===3 && cctvT>19){
+    cctvEvent=4; pdm.gateHold=true;
+    $('vt13').classList.add('alert'); $('vaShip').style.display='block';
+    banner('작업선 접근: 접안장 (CH-14)','운영 Agent — 수문 배수 시퀀스 보류(인터록 연동) · VHF ch.16 안내 방송','warn',6000);
+    logOps('운영Agent','CH-14 작업선 감지 (신뢰도 91%) — 배수 보류·VHF 경고','warn');
+  }
+  if(cctvEvent===4 && cctvT>29){
+    cctvEvent=5; pdm.gateHold=false;
+    $('vbShip').classList.add('ok'); $('vbShip').textContent='접안 완료 — 보류 해제';
+    $('vaShip').style.display='none';
+    banner('접안 완료: 배수 시퀀스 보류 해제 (CH-14)','운영 Agent 종결 — 정상 운영 복귀 · 이력 기록','ok',4800);
+    logOps('운영Agent','작업선 접안 완료 — 배수 보류 해제·정상 운영','good');
+  }
+  if(cctvEvent===5 && cctvT>36){
+    $('vt9').classList.remove('alert'); $('vt13').classList.remove('alert');
+  }
 }
 function robotTick(d){
   const r=robot; if(!r) return;
