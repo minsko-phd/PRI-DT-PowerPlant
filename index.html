@@ -3,67 +3,82 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>시화호 조력발전소 디지털 트윈 — 발전량 최적화 시뮬레이션</title>
+<title>자율 조력 발전소 디지털 트윈 — LG PRI × K-water 시화조력관리단</title>
 <style>
-  :root{ --red:#A60437; --teal:#0E7C7B; --gray:#757575; --green:#2D6A2D;
-    --panel:rgba(9,20,36,0.84); --line:rgba(255,255,255,0.12); }
+  :root{ --red:#A50034; --teal:#0E7C7B; --gray:#6B6B6B; --green:#2D6A2D;
+    --kblue:#005596; --klblue:#00B9ED; --korange:#FF9933; --ok:#5FB351; --danger:#E03131;
+    --panel:rgba(3,17,31,0.96); --line:rgba(255,255,255,0.12); }
+  /* 브랜드 표준: LG Red #A50034(브랜드 전용·알람과 분리) · K-water #005596/#00B9ED/#FF9933 */
   *{box-sizing:border-box;}
-  html,body{margin:0;height:100%;overflow:hidden;background:#05080f;
-    font-family:'Malgun Gothic','Apple SD Gothic Neo',Arial,sans-serif;color:#e8eef6;}
+  @font-face{font-family:'Roboto Condensed';font-style:normal;font-weight:400;
+    src:local('Roboto Condensed'),url('./vendor/fonts/roboto-condensed-400.woff2') format('woff2');}
+  @font-face{font-family:'Roboto Condensed';font-style:normal;font-weight:700;
+    src:local('Roboto Condensed Bold'),url('./vendor/fonts/roboto-condensed-700.woff2') format('woff2');}
+  /* PPT 표기 규칙과 동일: latin=Arial Narrow(→Roboto Condensed 폴백) + 한글=LG스마트체(로컬 설치 시) */
+  html,body{margin:0;height:100%;overflow:hidden;background:#04101d;
+    font-family:'Arial Narrow','Roboto Condensed','LG Smart','LG Smart_KR','LG Smart UI','Pretendard','Noto Sans KR','Malgun Gothic','Apple SD Gothic Neo',Arial,sans-serif;color:#e8eef6;}
   #app{position:fixed;inset:0;}
   canvas{display:block;}
   .hud{position:fixed;z-index:10;}
 
-  #title{top:14px;left:16px;max-width:430px;}
+  #title{top:14px;left:16px;max-width:470px;background:rgba(2,20,38,0.55);
+    border:1px solid rgba(255,255,255,0.08);border-radius:12px;padding:10px 13px;backdrop-filter:blur(7px);}
+  #title p{word-break:keep-all;}
   #title h1{margin:0;font-size:17px;letter-spacing:-0.3px;}
   #title h1 b{color:#ff5b86;}
   #title p{margin:4px 0 0;font-size:11.5px;color:#9fb0c6;line-height:1.5;}
   .tag{display:inline-block;margin-top:6px;padding:2px 8px;border-radius:10px;
     font-size:10.5px;background:rgba(14,124,123,0.25);border:1px solid rgba(14,124,123,0.5);color:#7fe7e4;}
 
-  #metrics{top:14px;right:16px;width:230px;background:var(--panel);
-    border:1px solid var(--line);border-radius:14px;padding:14px 14px 10px;backdrop-filter:blur(8px);}
+  #metrics{top:64px;right:16px;width:230px;background:var(--panel);
+    border:1px solid var(--line);border-left:3px solid var(--kblue);border-radius:10px;padding:14px 14px 10px;}
   #metrics .big{font-size:12px;color:#9fb0c6;margin-bottom:2px;}
   #power{font-size:34px;font-weight:800;line-height:1;letter-spacing:-1px;}
   #power small{font-size:14px;color:#9fb0c6;font-weight:600;}
   .bar{height:8px;border-radius:5px;background:rgba(255,255,255,0.10);margin:8px 0 12px;overflow:hidden;}
-  .bar>span{display:block;height:100%;width:0%;background:linear-gradient(90deg,#0E7C7B,#36d1c4);transition:width .2s;}
+  .bar>span{display:block;height:100%;width:0%;background:var(--klblue);transition:width .2s;}
   .grid2{display:grid;grid-template-columns:1fr 1fr;gap:8px 10px;}
   .cell .k{font-size:10px;color:#8aa0ba;}
   .cell .v{font-size:16px;font-weight:700;letter-spacing:-0.5px;}
   .cell .v u{font-size:10px;color:#8aa0ba;text-decoration:none;font-weight:600;}
   #state{margin-top:10px;padding:7px 10px;border-radius:9px;font-size:12px;font-weight:700;text-align:center;}
   .totrow{display:flex;justify-content:space-between;align-items:baseline;font-size:11.5px;color:#9fb0c6;margin:5px 0;}
-  .totrow b{color:#7fe07a;font-weight:800;font-variant-numeric:tabular-nums;}
+  .totrow b{color:#5fd2f5;font-weight:800;font-variant-numeric:tabular-nums;}
   .totrow.big2{margin-bottom:9px;} .totrow.big2 b{font-size:20px;}
-  #scenario{display:none;top:54px;left:50%;transform:translateX(-50%);max-width:80vw;text-align:center;
-    background:rgba(166,4,55,0.92);color:#fff;padding:9px 22px;border-radius:11px;font-size:16px;font-weight:800;
-    border:1px solid rgba(255,255,255,0.35);box-shadow:0 6px 24px rgba(0,0,0,0.4);letter-spacing:-0.2px;}
-  #scenario small{display:block;font-size:11.5px;font-weight:600;opacity:0.9;margin-top:2px;}
+  /* ISA-18.2 스타일 전폭 알람 라인 (앱바 직하) */
+  #scenario{display:none;z-index:19;top:54px;left:0;right:0;transform:none;max-width:none;text-align:left;
+    background:#0b2a44;color:#fff;padding:8px 16px 8px 13px;border-radius:0;font-size:13.5px;font-weight:700;
+    border:0;border-left:5px solid var(--klblue);border-bottom:1px solid rgba(255,255,255,0.10);
+    box-shadow:none;letter-spacing:-0.2px;display:none;align-items:baseline;gap:10px;}
+  #scenario small{display:inline;font-size:11.5px;font-weight:500;opacity:0.85;margin:0 0 0 4px;}
+  #scenario.info{background:#0b2a44;border-left-color:var(--klblue);}
+  #scenario.ok{background:#0e3524;border-left-color:var(--ok);}
+  #scenario.warn{background:#3d2410;border-left-color:var(--korange);}
+  #scenario.block{background:#3d1212;border-left-color:var(--danger);}
 
-  #panel{bottom:14px;left:16px;width:312px;background:var(--panel);
-    border:1px solid var(--line);border-radius:14px;padding:14px;backdrop-filter:blur(8px);
-    max-height:calc(100vh - 28px);overflow:auto;}
+  #panel{bottom:34px;left:16px;width:312px;background:var(--panel);border-left:3px solid var(--kblue);
+    border:1px solid var(--line);border-radius:10px;padding:14px;
+    max-height:calc(100vh - 260px);overflow:auto;}
   #panel h2{margin:0 0 10px;font-size:12.5px;color:#cdd9e8;display:flex;align-items:center;gap:7px;}
-  #panel h2:before{content:"";width:9px;height:9px;border-radius:50%;background:var(--red);}
+  #panel h2:before{content:"";width:3px;height:13px;border-radius:1.5px;background:var(--klblue);}
   .row{display:flex;align-items:center;gap:8px;margin:9px 0;font-size:11.5px;}
   .row label{flex:0 0 92px;color:#aebfd2;}
-  .row input[type=range]{flex:1;accent-color:#36d1c4;}
+  .row input[type=range]{flex:1;accent-color:var(--klblue);}
   .row .val{flex:0 0 54px;text-align:right;font-variant-numeric:tabular-nums;color:#fff;font-weight:700;}
   .modes{display:flex;gap:6px;margin-bottom:10px;}
-  .modes button{flex:1;padding:8px 4px;border-radius:9px;border:1px solid var(--line);
+  .modes button{flex:1;padding:8px 4px;border-radius:4px;border:1px solid var(--line);
     background:rgba(255,255,255,0.05);color:#cdd9e8;font-size:11.5px;cursor:pointer;font-weight:700;transition:.15s;}
-  .modes button.on{background:var(--red);border-color:var(--red);color:#fff;}
-  .modes button.ai.on{background:var(--teal);border-color:var(--teal);}
+  .modes button.on{background:var(--kblue);border-color:var(--kblue);color:#fff;}
+  .modes button.ai.on{background:#0273A8;border-color:#0273A8;}
   .opt{display:flex;gap:6px;margin-top:6px;}
-  .opt button{flex:1;padding:7px;border-radius:9px;border:1px solid var(--line);
+  .opt button{flex:1;padding:7px;border-radius:4px;border:1px solid var(--line);
     background:rgba(255,255,255,0.05);color:#cdd9e8;font-size:11px;cursor:pointer;}
   .opt button:hover{background:rgba(255,255,255,0.12);}
   .divider{height:1px;background:var(--line);margin:12px 0 10px;}
   .sec{font-size:11px;color:#7fe7e4;font-weight:700;margin-bottom:6px;}
-  #bSweep{width:100%;padding:9px;border-radius:9px;border:1px solid var(--teal);
-    background:rgba(14,124,123,0.30);color:#bff3f0;font-size:12px;font-weight:700;cursor:pointer;}
-  #bSweep:hover{background:rgba(14,124,123,0.5);}
+  #bSweep{width:100%;padding:9px;border-radius:4px;border:1px solid rgba(0,185,237,0.55);
+    background:rgba(0,109,166,0.30);color:#aee6fb;font-size:12px;font-weight:700;cursor:pointer;}
+  #bSweep:hover{background:rgba(0,133,199,0.45);}
   #chartWrap{display:none;margin-top:10px;}
   #optChart{width:100%;height:124px;display:block;background:rgba(0,0,0,0.25);border-radius:8px;}
   #optResult{font-size:11px;color:#cdd9e8;margin-top:7px;line-height:1.5;}
@@ -73,15 +88,15 @@
   .hint{font-size:10px;color:#7b8ba1;margin-top:9px;line-height:1.45;}
 
   #compare{bottom:14px;right:16px;width:230px;background:var(--panel);
-    border:1px solid var(--line);border-radius:14px;padding:13px 14px;backdrop-filter:blur(8px);font-size:11.5px;}
+    border:1px solid var(--line);border-left:3px solid var(--kblue);border-radius:10px;padding:13px 14px;font-size:11.5px;}
   #compare h3{margin:0 0 8px;font-size:12px;color:#cdd9e8;}
   #compare .line{display:flex;justify-content:space-between;margin:5px 0;}
-  #compare .line b{color:#36d1c4;font-variant-numeric:tabular-nums;}
+  #compare .line b{color:#5fd2f5;font-variant-numeric:tabular-nums;}
   #compare .delta{margin-top:8px;padding-top:8px;border-top:1px solid var(--line);
     display:flex;justify-content:space-between;font-weight:700;}
-  #compare .delta b{color:#7fe07a;}
+  #compare .delta b{color:#5fd2f5;}
 
-  .legend{position:fixed;left:50%;transform:translateX(-50%);bottom:14px;z-index:10;
+  .legend{position:fixed;left:50%;transform:translateX(-50%);bottom:28px;z-index:10;
     display:flex;gap:14px;background:var(--panel);border:1px solid var(--line);
     border-radius:11px;padding:8px 14px;font-size:11px;backdrop-filter:blur(8px);}
   .legend span{display:flex;align-items:center;gap:6px;color:#bcccde;}
@@ -102,8 +117,227 @@
   #loading{position:fixed;inset:0;z-index:50;display:flex;flex-direction:column;gap:18px;align-items:center;justify-content:center;
     background:#05080f;font-size:14px;color:#7fe7e4;letter-spacing:1px;}
   @media (max-width:1180px){ #brand{right:16px;top:64px;} }
-  .credit{position:fixed;left:16px;bottom:4px;font-size:9.5px;color:#5d6b80;z-index:5;}
+  .credit{position:fixed;left:50%;transform:translateX(-50%);bottom:6px;font-size:9.5px;color:#4d5a6d;opacity:0.75;z-index:5;white-space:nowrap;}
   @media (max-height:760px){ .legend{display:none;} }
+
+  /* ── 상단 앱바 (HMI 스타일) — K-water CI '무지개 천' 그라데이션 언더라인 ── */
+  #appbar{position:fixed;top:0;left:0;right:0;height:52px;z-index:20;display:flex;align-items:center;gap:16px;
+    padding:0 16px;background:rgba(3,15,28,0.93);backdrop-filter:blur(10px);
+    border-bottom:1px solid rgba(255,255,255,0.08);}
+  #appbar:after{content:"";position:absolute;left:0;right:0;bottom:-2px;height:2px;
+    background:linear-gradient(90deg,#005596 0%,#00B9ED 46%,#FF9933 100%);opacity:0.9;}
+  .ab-left{display:flex;align-items:center;gap:12px;min-width:0;}
+  .ab-kw{height:26px;background:#fff;padding:3px 8px;border-radius:6px;box-sizing:content-box;}
+  .ab-div{width:1px;height:26px;background:rgba(255,255,255,0.14);}
+  .ab-title b{display:block;font-size:13.5px;letter-spacing:-0.2px;color:#f2f7fc;font-weight:800;white-space:nowrap;}
+  .ab-title span{display:block;font-size:10px;color:#8fa6bd;white-space:nowrap;}
+  .ab-nav{margin-left:auto;display:flex;gap:3px;}
+  .ab-nav button{padding:6px 12px;border-radius:4px;border:1px solid transparent;background:transparent;
+    color:#b7c8da;font-size:11.5px;cursor:pointer;font-weight:600;font-family:inherit;white-space:nowrap;}
+  .ab-nav button:hover{background:rgba(255,255,255,0.07);border-color:rgba(255,255,255,0.09);}
+  .ab-right{display:flex;align-items:center;gap:9px;padding-left:14px;border-left:1px solid rgba(255,255,255,0.14);}
+  .ab-lg{width:30px;height:30px;flex:0 0 30px;}
+  .ab-lgtxt b{display:block;font-size:12px;color:#fff;letter-spacing:0.4px;}
+  .ab-lgtxt span{display:block;font-size:9px;color:#8fa6bd;letter-spacing:0.2px;}
+  .dic{width:13px;height:13px;flex:0 0 13px;color:#6f9cc4;}
+  .ab-speed{display:flex;align-items:center;gap:6px;padding:0 10px;border-left:1px solid rgba(255,255,255,0.12);margin-left:5px;}
+  .ab-speed input{width:74px;accent-color:var(--klblue);}
+  .ab-speed em{font-style:normal;font-size:10.5px;color:#8fa6bd;min-width:34px;font-variant-numeric:tabular-nums;}
+  .ps{font-size:12.5px;font-weight:800;padding:5px 13px;border-radius:4px;letter-spacing:-0.2px;white-space:nowrap;}
+  .ps.ok{background:rgba(0,185,237,0.14);color:#37c9f2;border:1px solid rgba(0,185,237,0.35);}
+  .ps.warn{background:rgba(255,153,51,0.16);color:#ffb45e;border:1px solid rgba(255,153,51,0.4);animation:blink 1.6s infinite;}
+  .ps.bad{background:rgba(224,49,49,0.18);color:#ff8a8a;border:1px solid rgba(224,49,49,0.45);animation:blink 1s infinite;}
+  .demo-zone{border:1px dashed rgba(0,185,237,0.35);border-radius:6px;padding:9px 10px 10px;margin-top:2px;position:relative;}
+  .demo-zone:before{content:"DEMO";position:absolute;top:-7px;right:8px;font-size:8.5px;font-weight:800;color:#37c9f2;
+    background:#06131f;padding:0 5px;letter-spacing:1.5px;}
+  #vcWrap{max-height:170px;overflow-y:auto;}
+
+  /* ── 데이터 레이크 (L2 수집·적재) ── */
+  #lake{top:420px;right:16px;width:230px;background:var(--panel);border:1px solid var(--line);
+    border-left:3px solid var(--kblue);border-radius:10px;padding:11px 12px;}
+  #lake h4{margin:0 0 8px;font-size:11.5px;color:#cfe6ff;font-weight:800;display:flex;justify-content:space-between;}
+  #lake h4 span{color:#5fb351;font-size:9px;font-weight:700;letter-spacing:0.5px;}
+  .lkrow{display:flex;justify-content:space-between;font-size:10.5px;color:#9fb0c6;padding:3px 0;}
+  .lkrow b{color:#e8eef6;font-variant-numeric:tabular-nums;font-weight:700;}
+  .lkrow b em{font-style:normal;color:#5fd2f5;}
+  #lakeSpark{width:100%;height:34px;display:block;margin-top:6px;background:rgba(0,0,0,0.25);border-radius:4px;}
+  .lkfoot{font-size:9px;color:#7b8ba1;margin-top:6px;border-top:1px solid var(--line);padding-top:5px;}
+  @media (max-height:820px){ #lake{display:none;} }
+
+  /* ── AI Agent 콘솔 (5개 과 + 공통) ── */
+  #agentWin{position:fixed;z-index:16;top:50%;left:50%;transform:translate(-50%,-52%);width:640px;height:470px;
+    background:#061524;border:1px solid rgba(255,255,255,0.14);border-top:2px solid var(--klblue);
+    border-radius:10px;display:none;flex-direction:column;box-shadow:0 18px 60px rgba(0,0,0,0.55);}
+  #agentWin.show{display:flex;}
+  .agHead{display:flex;align-items:center;gap:10px;padding:10px 14px;border-bottom:1px solid var(--line);}
+  .agHead b{font-size:12.5px;color:#f2f7fc;}
+  .agHead .exa{font-size:8.5px;font-weight:800;color:#37c9f2;border:1px solid rgba(0,185,237,0.4);
+    border-radius:3px;padding:1px 6px;letter-spacing:0.8px;}
+  .agHead .hitl{font-size:8.5px;font-weight:800;color:#ffb45e;border:1px solid rgba(255,153,51,0.4);
+    border-radius:3px;padding:1px 6px;letter-spacing:0.8px;}
+  #agClose{margin-left:auto;background:none;border:1px solid var(--line);color:#8fa6bd;border-radius:4px;
+    padding:3px 10px;cursor:pointer;font-size:11px;}
+  #agClose:hover{background:rgba(255,255,255,0.08);}
+  .agBody{flex:1;display:flex;min-height:0;}
+  #agTabs{width:108px;border-right:1px solid var(--line);padding:8px 6px;display:flex;flex-direction:column;gap:4px;}
+  #agTabs button{background:none;border:1px solid transparent;color:#8fa6bd;font-size:10.5px;font-weight:700;
+    padding:7px 6px;border-radius:4px;cursor:pointer;text-align:left;font-family:inherit;}
+  #agTabs button.on{background:rgba(0,85,150,0.35);color:#bfe9ff;border-color:rgba(0,185,237,0.35);}
+  #agTabs button:hover{background:rgba(255,255,255,0.06);}
+  #agChat{flex:1;padding:12px 14px;overflow-y:auto;display:flex;flex-direction:column;gap:9px;}
+  .agQ{align-self:flex-end;max-width:78%;background:#0d3a5c;color:#dff2ff;font-size:11.5px;
+    padding:7px 11px;border-radius:9px 9px 2px 9px;line-height:1.5;}
+  .agA{align-self:flex-start;max-width:86%;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.08);
+    color:#cdd9e8;font-size:11.5px;padding:8px 11px;border-radius:9px 9px 9px 2px;line-height:1.5;}
+  .agA .who{font-size:9px;color:#37c9f2;font-weight:800;letter-spacing:0.4px;margin-bottom:3px;}
+  .agCard{margin-top:6px;background:rgba(0,85,150,0.16);border:1px solid rgba(0,185,237,0.3);border-radius:6px;
+    padding:7px 9px;font-size:10.5px;color:#bfe0f5;}
+  .agCard div{padding:1.5px 0;}
+  .agTyping{align-self:flex-start;color:#5d8aa8;font-size:10.5px;padding:2px 4px;}
+  #agChips{display:flex;gap:6px;padding:9px 12px;border-top:1px solid var(--line);flex-wrap:wrap;}
+  #agChips button{background:rgba(255,255,255,0.05);border:1px solid rgba(0,185,237,0.3);color:#9fd8f2;
+    font-size:10.5px;padding:5px 10px;border-radius:12px;cursor:pointer;font-family:inherit;}
+  #agChips button:hover{background:rgba(0,133,199,0.3);}
+
+  /* ── CCTV 통합 감시 — 실사 VMS 월 (2×2) ── */
+  #cctv{position:fixed;inset:0;z-index:14;display:none;background:#05090e;padding:60px 16px 44px;}
+  #cctv.show{display:block;}
+  .vmsGrid{display:grid;grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr;gap:8px;height:100%;}
+  .vmsTile{position:relative;border:1px solid rgba(255,255,255,0.14);border-radius:4px;overflow:hidden;
+    background-size:cover;background-position:center;}
+  .vmsTile:after{content:"";position:absolute;inset:0;pointer-events:none;
+    background:repeating-linear-gradient(0deg,rgba(0,0,0,0.09) 0 1px,transparent 1px 3px),
+      radial-gradient(ellipse at center,transparent 55%,rgba(0,10,20,0.42) 100%);}
+  .vmsTile .img{position:absolute;inset:0;background-size:cover;background-position:center;
+    filter:saturate(0.82) contrast(1.05) brightness(0.96);animation:vmsPan 26s ease-in-out infinite alternate;}
+  .vmsTile:nth-child(2) .img{animation-duration:31s;} .vmsTile:nth-child(3) .img{animation-duration:23s;}
+  .vmsTile:nth-child(4) .img{animation-duration:35s;}
+  @keyframes vmsPan{from{transform:scale(1.02) translate(0,0);}to{transform:scale(1.12) translate(-1.6%,1.2%);}}
+  .vmsHead{position:absolute;top:0;left:0;right:0;z-index:2;display:flex;align-items:center;gap:8px;
+    padding:6px 10px;background:linear-gradient(180deg,rgba(0,0,0,0.62),transparent);
+    font-size:11.5px;font-weight:800;color:#e6f3fb;}
+  .vmsHead .rec{color:#ff5b5b;animation:blink 1.2s infinite;font-size:9px;}
+  .vmsHead .ts{margin-left:auto;font-size:9.5px;font-weight:600;color:#aac6da;font-variant-numeric:tabular-nums;}
+  .vmsFoot{position:absolute;bottom:0;left:0;right:0;z-index:2;padding:5px 10px;font-size:9px;color:#8fb4cc;
+    background:linear-gradient(0deg,rgba(0,0,0,0.55),transparent);display:flex;justify-content:space-between;}
+  .vmsTile.alert{border:2px solid var(--danger);box-shadow:0 0 0 1px rgba(224,49,49,0.4),0 0 22px rgba(224,49,49,0.35) inset;}
+  .vmsTile.alert .vmsHead{background:linear-gradient(180deg,rgba(140,10,10,0.72),transparent);}
+  .vmsBadge{position:absolute;z-index:3;top:34px;left:10px;display:none;background:rgba(224,49,49,0.92);
+    color:#fff;font-size:10.5px;font-weight:800;border-radius:3px;padding:4px 9px;letter-spacing:-0.2px;}
+  .vmsBadge.ok{background:rgba(45,106,45,0.92);}
+  .vmsTile.alert .vmsBadge{display:block;}
+  .vmsAI{position:absolute;z-index:3;border:2px solid rgba(224,49,49,0.9);border-radius:3px;display:none;
+    box-shadow:0 0 12px rgba(224,49,49,0.5);}
+  .vmsAI em{position:absolute;top:-16px;left:-2px;font-style:normal;font-size:8.5px;font-weight:800;
+    background:rgba(224,49,49,0.92);color:#fff;padding:1px 5px;border-radius:2px;white-space:nowrap;}
+  .cctvBR{position:absolute;bottom:8px;left:50%;transform:translateX(-50%);z-index:5;background:rgba(0,0,0,0.7);
+    border:1px solid rgba(255,255,255,0.15);border-radius:4px;padding:6px 14px;font-size:11px;color:#cde4f5;}
+  .cctvBR b{color:#ffd34d;}
+  #cctvExit{position:absolute;top:60px;left:50%;transform:translateX(-50%);z-index:21;
+    background:rgba(0,0,0,0.65);border:1px solid rgba(255,255,255,0.25);color:#dfe9f2;border-radius:4px;
+    padding:5px 16px;font-size:11px;cursor:pointer;font-family:inherit;}
+  #cctvExit:hover{background:rgba(224,49,49,0.5);}
+
+  /* ── VTS 가상훈련 패널 ── */
+  #vts{top:64px;right:258px;width:276px;background:var(--panel);border:1px solid var(--line);
+    border-left:3px solid #7c5cff;border-radius:10px;padding:13px 14px;display:none;
+    max-height:calc(100vh - 84px);overflow:auto;}
+  #vts.show{display:block;}
+  #vts h3{margin:0 0 4px;font-size:12px;color:#cdd9e8;display:flex;justify-content:space-between;align-items:center;}
+  #vts h3 span{font-size:9.5px;padding:2px 8px;border-radius:8px;background:rgba(124,92,255,0.22);color:#c3b2ff;}
+  .vtsMeta{display:flex;justify-content:space-between;font-size:10px;color:#8aa0ba;margin-bottom:8px;
+    border-bottom:1px solid var(--line);padding-bottom:7px;}
+  .vtsMeta b{color:#e8eef6;font-variant-numeric:tabular-nums;}
+  #vtsSteps{list-style:none;margin:0;padding:0;}
+  #vtsSteps li{display:flex;gap:8px;padding:4.5px 0;opacity:0.55;border-bottom:1px dashed rgba(255,255,255,0.06);}
+  #vtsSteps li i{width:8px;height:8px;border-radius:50%;background:#5d6b80;margin-top:4px;flex:0 0 8px;}
+  #vtsSteps li b{font-size:11px;}
+  #vtsSteps li span{display:block;font-size:9.5px;color:#8aa0ba;}
+  #vtsSteps li>div{flex:1;}
+  #vtsSteps li.run{opacity:1;} #vtsSteps li.run i{background:#7c5cff;box-shadow:0 0 7px #7c5cff;animation:blink 1s infinite;}
+  #vtsSteps li.done{opacity:1;} #vtsSteps li.done i{background:var(--ok);}
+  #vtsRisk{margin-top:9px;display:none;background:rgba(255,153,51,0.13);border:1px solid rgba(255,153,51,0.4);
+    border-radius:8px;padding:8px 10px;font-size:10.5px;color:#ffd9a3;line-height:1.5;}
+  #vtsRisk b{color:#ffb45e;}
+  #vtsEval{margin-top:9px;display:none;background:rgba(0,85,150,0.16);border:1px solid rgba(0,185,237,0.35);
+    border-radius:8px;padding:9px 10px;font-size:10.5px;color:#bfe0f5;}
+  #vtsEval .erow{display:flex;justify-content:space-between;padding:2px 0;}
+  #vtsEval .erow b{color:#9fe08f;font-variant-numeric:tabular-nums;}
+  #vtsEval .ehead{color:#7fdcff;font-weight:800;margin-bottom:4px;font-size:10px;}
+  #vtsExit{width:100%;margin-top:10px;padding:8px;border-radius:4px;border:1px solid var(--line);
+    background:rgba(255,255,255,0.06);color:#cdd9e8;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit;}
+  #vtsExit:hover{background:rgba(224,49,49,0.35);}
+  @media (max-width:1280px){ .ab-title span{display:none;} }
+
+
+  /* ── DOS 통합 관제 바 (Scene: 본다 — 발전·수질·방재·안전 1화면) ── */
+  #dos{top:64px;left:16px;width:240px;background:var(--panel);border:1px solid var(--line);
+    border-left:3px solid var(--kblue);border-radius:10px;padding:11px 12px;}
+  #dos .dosHead{font-size:11.5px;font-weight:800;color:#cfe6ff;display:flex;justify-content:space-between;margin-bottom:8px;letter-spacing:0.2px;}
+  #dos .dosHead span{color:#7fb7e6;font-weight:600;font-variant-numeric:tabular-nums;}
+  .dosGrid{display:grid;grid-template-columns:1fr 1fr;gap:7px;}
+  .dcell{display:flex;gap:7px;align-items:center;background:rgba(255,255,255,0.04);
+    border:1px solid rgba(255,255,255,0.07);border-radius:9px;padding:6px 8px;}
+  .dcell .dk{font-size:9.5px;color:#8aa0ba;}
+  .dcell .dv{font-size:12.5px;font-weight:800;letter-spacing:-0.3px;white-space:nowrap;}
+  .led{width:8px;height:8px;border-radius:50%;flex:0 0 8px;}
+  .led.ok{background:var(--ok);box-shadow:0 0 6px var(--ok);}
+  .led.warn{background:var(--korange);box-shadow:0 0 6px var(--korange);}
+  .led.bad{background:var(--danger);box-shadow:0 0 7px var(--danger);animation:blink 1s infinite;}
+  @keyframes blink{50%{opacity:0.35;}}
+  .dosAlert{margin-top:8px;font-size:10.5px;color:#9fb0c6;border-top:1px solid var(--line);padding-top:7px;}
+  .dosAlert b{color:#e8eef6;}
+
+  /* ── 터빈 상태 스트립 (예지보전) ── */
+  #turbstrip{display:flex;gap:3px;margin-top:9px;}
+  .tchip{flex:1;text-align:center;font-size:10px;font-weight:700;padding:4px 0;border-radius:3px;
+    background:rgba(255,255,255,0.06);color:#8aa0ba;border:1px solid transparent;min-width:0;}
+  .tchip.on{background:rgba(95,179,81,0.22);color:#9fe08f;border-color:rgba(95,179,81,0.4);}
+  .tchip.alarm{background:rgba(224,49,49,0.32);color:#ffb3b3;border-color:var(--danger);box-shadow:0 0 0 1.5px rgba(224,49,49,0.5);animation:blink 1s infinite;}
+  .tchip.off{background:rgba(255,153,51,0.2);color:#ffcf9e;border-color:rgba(255,153,51,0.45);}
+
+  /* ── AI Agent 자율 운영 루프 패널 (8단계 · HITL) ── */
+  #loop{top:64px;right:258px;width:276px;background:var(--panel);border:1px solid var(--line);
+    border-left:3px solid var(--korange);border-radius:10px;padding:13px 14px;display:none;
+    max-height:calc(100vh - 84px);overflow:auto;}
+  #loop.show{display:block;}
+  #loop h3{margin:0 0 9px;font-size:12px;color:#cdd9e8;display:flex;justify-content:space-between;align-items:center;}
+  #loop h3 span{font-size:9.5px;padding:2px 8px;border-radius:8px;background:rgba(255,255,255,0.08);color:#8aa0ba;}
+  #loop h3 span.live{background:rgba(224,49,49,0.25);color:#ffb3b3;}
+  #loop h3 span.done{background:rgba(95,179,81,0.25);color:#9fe08f;}
+  #loopSteps{list-style:none;margin:0;padding:0;}
+  #loopSteps li{display:flex;gap:8px;padding:5px 0;opacity:0.6;border-bottom:1px dashed rgba(255,255,255,0.06);}
+  #loopSteps li i{width:8px;height:8px;border-radius:50%;background:#5d6b80;margin-top:4px;flex:0 0 8px;}
+  #loopSteps li b{font-size:11px;}
+  #loopSteps li em{font-style:normal;font-size:8.5px;color:#7fb7e6;border:1px solid rgba(127,183,230,0.4);border-radius:6px;padding:0 5px;margin-left:4px;}
+  #loopSteps li>div{flex:1;} #loopSteps li span{display:block;font-size:9.5px;color:#8aa0ba;}
+  .lsx{font-size:9.5px;color:#ffd9a3;line-height:1.4;margin-top:2px;}
+  #loopSteps li.run{opacity:1;} #loopSteps li.run i{background:var(--korange);box-shadow:0 0 7px var(--korange);animation:blink 1s infinite;}
+  #loopSteps li.done{opacity:1;} #loopSteps li.done i{background:var(--ok);}
+  .vbox{margin-top:9px;background:rgba(0,85,150,0.16);border:1px solid rgba(0,185,237,0.35);border-radius:10px;padding:9px 10px;font-size:10.5px;}
+  .vrow{display:flex;justify-content:space-between;margin:3px 0;color:#cdd9e8;gap:6px;}
+  .vrow b{font-variant-numeric:tabular-nums;white-space:nowrap;}
+  .vrow b.good{color:#9fe08f;} .vrow b.badv{color:#ff9d9d;}
+  .vsum{margin-top:6px;padding-top:6px;border-top:1px solid rgba(255,255,255,0.12);color:#bfe9ff;font-weight:700;font-size:10.5px;line-height:1.45;}
+  #loopActions{display:none;gap:7px;margin-top:10px;}
+  #loopActions button{flex:1;padding:8px 6px;border-radius:9px;font-size:11px;font-weight:800;cursor:pointer;border:1px solid var(--line);}
+  #bApprove{background:var(--kblue);border-color:var(--kblue)!important;color:#fff;}
+  #bApprove:hover{background:#0d6ab3;}
+  #bReject{background:rgba(255,255,255,0.06);color:#cdd9e8;}
+  #loopLog{max-height:150px;overflow-y:auto;padding-bottom:6px;}
+  .logline{font-size:9.5px;color:#9fb0c6;padding:3px 0;border-bottom:1px dashed rgba(255,255,255,0.05);line-height:1.4;}
+  .logline span{color:#5d8aa8;margin-right:5px;font-variant-numeric:tabular-nums;}
+  .logline b{color:#bfd4e8;} .logline.warn b{color:#ffcf9e;} .logline.bad b{color:#ff9d9d;} .logline.good b{color:#9fe08f;}
+
+  /* ── VC 인터록 검증 테이블 ── */
+  #vcWrap{margin-top:8px;}
+  .vchead{font-size:10px;color:#7fdcff;font-weight:800;margin-bottom:5px;}
+  .vcrow{display:flex;align-items:center;gap:7px;font-size:10px;color:#bcccde;padding:4px 6px;border-radius:6px;margin:2px 0;background:rgba(255,255,255,0.035);}
+  .vcrow span{flex:1;} .vcrow b{color:#ffcf9e;font-weight:700;white-space:nowrap;}
+  .vcrow em{font-style:normal;font-weight:800;font-size:9px;}
+  .vcrow.p em{color:#9fe08f;} .vcrow.f em{color:#ff9d9d;}
+  .vcfoot{font-size:9px;color:#7b8ba1;margin-top:4px;line-height:1.4;}
+  @media (max-width:1420px){ #loop{right:16px;top:352px;} }
 </style>
 </head>
 <body>
@@ -111,47 +345,66 @@
 
 <!-- LG PRI 브랜드 마크 (LG 레드 #A50034 페이스 심볼) -->
 <svg width="0" height="0" style="position:absolute">
-  <symbol id="lglogo" viewBox="0 0 100 100">
-    <circle cx="50" cy="50" r="49" fill="#A50034"/>
-    <circle cx="64" cy="33" r="6.4" fill="#fff"/>
-    <path d="M34 30 L34 64 L62 64" fill="none" stroke="#fff" stroke-width="6.2" stroke-linecap="round"/>
-    <path d="M50 64 A14 14 0 1 0 64 50 L64 58 L57 58"
-          fill="none" stroke="#fff" stroke-width="6.2" stroke-linecap="round" stroke-linejoin="round"/>
+  <!-- LG 공식 심볼 (Wikimedia Commons LG_logo_(2014).svg 기하 그대로 · LG Red #A50034) -->
+  <symbol id="lglogo" viewBox="9.9 9.7 255.7 255.7">
+    <path d="m228.04 227.83c49.881-49.881 49.878-130.76-0.00491-180.63-49.883-49.879-130.76-49.885-180.63-0.004909-49.881 49.88-49.878 130.76 0.004909 180.63 49.882 49.883 130.76 49.885 180.63 0.00573z" fill="#A50034"/>
+    <path d="m98.971 112.6c2.9124-0.0139 5.7553-0.8909 8.1703-2.5197 2.4142-1.628 4.2925-3.935 5.3969-6.6298 1.1052-2.6948 1.3867-5.6571 0.80991-8.5114-0.57757-2.8551-1.9871-5.4747-4.0512-7.5289-2.0649-2.0542-4.6918-3.4515-7.5493-4.0144-2.8568-0.56285-5.8174-0.2667-8.5065 0.85081-2.6899 1.1183-4.9879 3.0073-6.6044 5.4305-1.6165 2.4224-2.4788 5.2693-2.4788 8.1817 0.0041 1.9405 0.39105 3.8614 1.138 5.6522 0.74773 1.7916 1.8399 3.418 3.2151 4.7866 1.376 1.3687 3.0081 2.4534 4.8022 3.1914 1.7949 0.73873 3.7174 1.1159 5.6579 1.111zm135.1 28.96h-64.955v-9.6216h74.475c0.10145 1.8636 0.15217 3.7264 0.15217 5.6121 0 57.936-47.218 104.9-105.45 104.9-58.234 0-105.46-46.935-105.46-104.9 0-57.96 47.211-104.9 105.45-104.9 1.5372 0 3.067 0.03109 4.5895 0.09408v9.5496c-1.5225-0.0679-3.0474-0.10144-4.5756-0.10144-52.931 0-95.856 42.694-95.856 95.348 0 52.655 42.919 95.357 95.856 95.357 51.482 0 93.54-40.395 95.766-91.07zm-65.103 40.085h-26.104v-98.073h-9.651v107.76h9.6731v-0.0646h26.104z" fill="#fff"/>
   </symbol>
+  <symbol id="i-bolt" viewBox="0 0 16 16"><path d="M9 1 3 9h4l-1 6 6-8H8l1-6z" fill="currentColor"/></symbol>
+  <symbol id="i-drop" viewBox="0 0 16 16"><path d="M8 1C8 1 3 7 3 10a5 5 0 0 0 10 0C13 7 8 1 8 1z" fill="currentColor"/></symbol>
+  <symbol id="i-shield" viewBox="0 0 16 16"><path d="M8 1 14 3v5c0 4-3 6-6 7-3-1-6-3-6-7V3l6-2z" fill="currentColor"/></symbol>
+  <symbol id="i-helmet" viewBox="0 0 16 16"><path d="M2 11a6 6 0 0 1 12 0v1H2v-1z" fill="currentColor"/><rect x="1" y="13" width="14" height="2" rx="1" fill="currentColor"/></symbol>
 </svg>
 
-<div id="brand">
-  <svg class="lg"><use href="#lglogo"/></svg>
-  <div class="txt"><b>LG PRI</b><span>Smart Factory 솔루션센터</span></div>
-</div>
+<header id="appbar">
+  <div class="ab-left">
+    <img class="ab-kw" src="./vendor/kwater_logo.png" alt="K-water">
+    <div class="ab-div"></div>
+    <div class="ab-title">
+      <b>시화호 조력발전소 통합 운영 트윈</b>
+      <span>경기도 안산 · 벌브 수차 25.4MW×10기 · 수문 8문 — Plant OS · Human-in-the-loop · K-TOP Shadow 교차검증</span>
+    </div>
+  </div>
+  <nav class="ab-nav" id="topbtns">
+    <button id="bView">시점 전환</button>
+    <button id="bTour">자동 투어</button>
+    <button id="bNight">야간</button>
+    <button id="bFull">전체화면</button>
+    <button id="bPlay">일시정지</button>
+    <span class="ab-speed"><input type="range" id="sSpeed" min="1" max="400" step="1" value="120"><em id="vSpeed">120×</em></span>
+  </nav>
+  <div id="plantStatus" class="ps ok">정상 운전</div>
+  <div class="ab-right">
+    <svg class="ab-lg"><use href="#lglogo"/></svg>
+    <div class="ab-lgtxt"><b>LG PRI</b><span>Digital Twin 솔루션</span></div>
+  </div>
+</header>
 
 <div id="loading">
   <svg width="64" height="64"><use href="#lglogo"/></svg>
   시화호 디지털 트윈 로딩 중…
 </div>
 
-<div class="hud" id="title">
-  <h1>🌊 시화호 조력발전소 <b>디지털 트윈</b></h1>
-  <p>경기도 안산 · 세계 최대 단류식(창조) 조력발전 · 25.4MW 수차발전기 10기 · 수문 8문<br>
-     <b style="color:#7fe7e4">조석 1주기 동안 발전량을 최대로</b> — 수문·터빈 운전 전략 시뮬레이션</p>
-  <span class="tag">Plant OS · Human-in-the-loop · K-TOP 병행 교차검증</span>
-</div>
-
-<div class="hud" id="topbtns">
-  <button id="bView">🎥 시점 전환</button>
-  <button id="bTour">🎬 시네마틱</button>
-  <button id="bNight">🌙 야간</button>
-  <button id="bFull">⛶ 전체화면</button>
-  <button id="bPlay">⏸ 일시정지</button>
-</div>
 <div class="hud" id="scenario"></div>
+
+<!-- DOS 통합 관제 — 발전·수질·방재·안전 1화면 (PPT Scene: 본다) -->
+<div class="hud" id="dos">
+  <div class="dosHead"><span style="color:#cfe6ff">DOS 통합 관제</span><span id="dosClock">D0 00:00</span></div>
+  <div class="dosGrid">
+    <div class="dcell"><i id="dLed0" class="led ok"></i><svg class="dic"><use href="#i-bolt"/></svg><div><div class="dk">발전</div><div class="dv" id="dGen">0 MW</div></div></div>
+    <div class="dcell"><i id="dLed1" class="led ok"></i><svg class="dic"><use href="#i-drop"/></svg><div><div class="dk">수질 (DO)</div><div class="dv" id="dWq">8.2 ㎎/L</div></div></div>
+    <div class="dcell"><i id="dLed2" class="led ok"></i><svg class="dic"><use href="#i-shield"/></svg><div><div class="dk">방재</div><div class="dv" id="dFld">관심</div></div></div>
+    <div class="dcell"><i id="dLed3" class="led ok"></i><svg class="dic"><use href="#i-helmet"/></svg><div><div class="dk">안전</div><div class="dv" id="dSaf">작업 0건</div></div></div>
+  </div>
+  <div class="dosAlert">위기경보 <b id="crisisLv" style="color:#5FB351">관심</b> · K-TOP Shadow 일치율 <b id="shadowPct">99.2%</b></div>
+</div>
 
 <div class="hud" id="metrics">
   <div class="big">현재 발전 출력</div>
   <div id="power">0<small> MW</small></div>
   <div class="bar"><span id="powerbar"></span></div>
-  <div class="totrow"><span>⏱ 경과 시간</span><b id="elapsed">0일 00시간</b></div>
-  <div class="totrow big2"><span>Σ 총 누적 발전</span><b id="totMWh">0 MWh</b></div>
+  <div class="totrow"><span>경과 시간</span><b id="elapsed">0일 00시간</b></div>
+  <div class="totrow big2"><span>총 누적 발전</span><b id="totMWh">0 MWh</b></div>
   <div class="grid2">
     <div class="cell"><div class="k">바다 수위</div><div class="v"><span id="seaLv">0.0</span><u> m</u></div></div>
     <div class="cell"><div class="k">호소 수위</div><div class="v"><span id="lakeLv">0.0</span><u> m</u></div></div>
@@ -159,10 +412,11 @@
     <div class="cell"><div class="k">가동 터빈</div><div class="v"><span id="nturb">10</span><u> / 10기</u></div></div>
   </div>
   <div id="state">대기</div>
+  <div id="turbstrip"></div>
 </div>
 
 <div class="hud" id="panel">
-  <h2>운전 제어 — 발전량 최적화</h2>
+  <h2>운전 제어</h2>
   <div class="modes">
     <button id="mManual" class="on">수동 운전</button>
     <button id="mAI" class="ai">AI 최적 운전</button>
@@ -192,32 +446,117 @@
     <input type="range" id="sAmp" min="2.4" max="4.2" step="0.1" value="3.3">
     <span class="val" id="vAmp">6.6 m</span>
   </div>
-  <div class="row">
-    <label>시뮬 속도</label>
-    <input type="range" id="sSpeed" min="1" max="400" step="1" value="120">
-    <span class="val" id="vSpeed">120×</span>
-  </div>
   <div class="opt">
-    <button id="bReset">⟲ 리셋</button>
+    <button id="bReset">리셋</button>
   </div>
 
   <div class="divider"></div>
-  <div class="sec">📈 자동 최적화 — 개시 낙차 스윕</div>
-  <button id="bSweep">발전량 vs 개시 낙차 자동 계산 ▶</button>
+  <div class="sec">개시 낙차 최적화</div>
+  <button id="bSweep">개시 낙차 최적화 실행</button>
   <div id="chartWrap">
     <canvas id="optChart" width="560" height="248"></canvas>
     <div id="optResult"></div>
-    <button id="bApply">★ 최적값 적용 (AI 운전 전환)</button>
+    <button id="bApply">최적값 적용 — AI 운전 전환</button>
   </div>
-  <p class="hint">단류식 창조발전: ① 수문 닫고 바다↑ 낙차 축적 → ② 바다→호소 통수 발전 → ③ 만조 정체 → ④ 수문 열어 호소 배수 → 반복. <b style="color:#ff8fae">개시 낙차</b>가 너무 낮으면 낙차를 못 키워 출력이 붕괴, 너무 높으면 밀물 시간을 낭비 — 그 사이에 최적점이 있습니다.</p>
+  <div class="divider"></div>
+  <div class="demo-zone">
+  <div class="sec demo-sec">시연 시나리오 (Agent 6종 · CCTV · VTS · VC · 예지보전)</div>
+  <div class="opt">
+    <button id="bAgent">AI Agent 콘솔</button>
+    <button id="bCCTV">CCTV·로봇 순찰</button>
+  </div>
+  <div class="opt">
+    <button id="bVTS">VTS 분해점검 훈련</button>
+  </div>
+  <div class="opt">
+    <button id="bFault">터빈 이상 주입</button>
+    <button id="bVC">VC 인터록 검증</button>
+  </div>
+  <div class="opt">
+    <button id="bViol">위반 주입 — 발전 중 수문 개방 시도</button>
+  </div>
+  <div class="opt">
+    <button id="bAuto" style="border-color:rgba(0,185,237,0.5);background:rgba(0,85,150,0.28);color:#bfe9ff;font-weight:700">데모 시나리오 자동 진행 (전 씬 · 약 100초)</button>
+  </div>
+  <div id="vcWrap"></div>
+  </div>
+
+  <p class="hint" style="display:none">단류식 창조발전: ① 수문 닫고 바다↑ 낙차 축적 → ② 바다→호소 통수 발전 → ③ 만조 정체 → ④ 수문 열어 호소 배수 → 반복. <b style="color:#ff8fae">개시 낙차</b>가 너무 낮으면 낙차를 못 키워 출력이 붕괴, 너무 높으면 밀물 시간을 낭비 — 그 사이에 최적점이 있습니다.</p>
 </div>
 
 <div class="hud" id="compare">
-  <h3>📊 성과 (직전 주기 기준)</h3>
+  <h3 id="perfTitle">발전 실적 (직전 주기 기준)</h3>
   <div class="line"><span>주기당 발전량</span><b><span id="cCycle">0</span> MWh</b></div>
   <div class="line"><span>일 환산</span><b><span id="cDay">0.00</span> GWh</b></div>
   <div class="line"><span>연 환산</span><b><span id="cYear">0</span> GWh</b></div>
   <div class="delta"><span>설계목표 552GWh 대비</span><b><span id="cPct">0</span>%</b></div>
+</div>
+
+<!-- 데이터 레이크 — L2 수집·적재 (PPT: 수집 게이트웨이·시계열 DB·문서·영상 저장소) -->
+<div class="hud" id="lake">
+  <h4>데이터 레이크 (L2 수집·적재) <span>LIVE</span></h4>
+  <div class="lkrow"><span>수집 게이트웨이 (읽기 전용)</span><b><em id="lkTag">1,284</em> tag/s</b></div>
+  <div class="lkrow"><span>시계열 DB</span><b id="lkDb">2.41 TB · 99.8%</b></div>
+  <div class="lkrow"><span>문서 저장소 (KKS 태깅)</span><b id="lkDoc">1,247건</b></div>
+  <div class="lkrow"><span>영상 (SmartFLO 지식화)</span><b id="lkVid">86편</b></div>
+  <canvas id="lakeSpark" width="412" height="68"></canvas>
+  <div class="lkfoot">단방향 수집 · SCADA(안드리츠) 영향 원천 차단 · 폐쇄망</div>
+</div>
+
+<!-- AI Agent 자율 운영 루프 — 8단계 · HITL (PPT Scene: 판단한다) -->
+<div class="hud" id="loop">
+  <h3>AI Agent 자율 운영 루프 <span id="loopTag">대기</span></h3>
+  <ol id="loopSteps"></ol>
+  <div id="loopVerify"></div>
+  <div id="loopActions">
+    <button id="bApprove">승인 — 계획정비</button>
+    <button id="bReject">보류</button>
+  </div>
+  <div id="loopLog"></div>
+</div>
+
+<!-- AI Agent 콘솔 — 5개 과 + 공통 (PPT p.3 부서별 매핑 · 유첨 3~8) -->
+<div id="agentWin">
+  <div class="agHead"><b>AI Agent 콘솔</b><span class="exa">EXAONE 온프레</span><span class="hitl">HITL</span>
+    <button id="agClose">닫기</button></div>
+  <div class="agBody">
+    <div id="agTabs"></div>
+    <div id="agChat"></div>
+  </div>
+  <div id="agChips"></div>
+</div>
+
+<!-- CCTV 통합 감시 — 실사 VMS 월 (시화호 실물 사진 · PPT p.4 ④) -->
+<div id="cctv">
+  <button id="cctvExit">CCTV 종료 (ESC)</button>
+  <div class="vmsGrid">
+    <div class="vmsTile" id="vt0"><div class="img" style="background-image:url('./vendor/cctv/cam1_seawall.jpg')"></div>
+      <div class="vmsHead"><i class="rec">●</i>CAM-01 · 방조제 동측 <span class="ts" id="ts0"></span></div>
+      <div class="vmsFoot"><span>1920×1080 · 30fps</span><span>AI 분석 ON</span></div></div>
+    <div class="vmsTile" id="vt1"><div class="img" style="background-image:url('./vendor/cctv/cam2_plant.jpg')"></div>
+      <div class="vmsHead"><i class="rec">●</i>CAM-02 · 발전소 전경 (항공) <span class="ts" id="ts1"></span></div>
+      <div class="vmsFoot"><span>1920×1080 · 30fps</span><span>AI 분석 ON</span></div></div>
+    <div class="vmsTile" id="vt2"><div class="img" style="background-image:url('./vendor/cctv/cam3_sluice.jpg')"></div>
+      <div class="vmsHead"><i class="rec">●</i>CAM-03 · 수문부(갑문) 협소구역 <span class="ts" id="ts2"></span></div>
+      <div class="vmsBadge" id="vb2">접근 감지 — PR-01 출동</div>
+      <div class="vmsAI" id="va2" style="left:58%;top:46%;width:15%;height:26%"><em>객체: 선박 · 신뢰도 91%</em></div>
+      <div class="vmsFoot"><span>1920×1080 · 30fps</span><span>AI 분석 ON</span></div></div>
+    <div class="vmsTile" id="vt3"><div class="img" style="background-image:url('./vendor/cctv/cam4_tower.jpg')"></div>
+      <div class="vmsHead"><i class="rec">●</i>CAM-04 · 달전망대·문화관 <span class="ts" id="ts3"></span></div>
+      <div class="vmsFoot"><span>1920×1080 · 30fps</span><span>AI 분석 ON</span></div></div>
+  </div>
+  <div class="cctvBR">패트롤 로봇 <b>PR-01</b> <span id="prState">방조제 순찰 중</span> · 배터리 <span id="prBatt">82%</span> · 영상: K-water 시화호 실촬영(Wikimedia Commons)</div>
+</div>
+
+<!-- VTS 가상훈련 — 수차 분해점검 (PPT Scene③ · '27 최초 분해점검 대비) -->
+<div class="hud" id="vts">
+  <h3>VTS 가상훈련 · 수차 분해점검 <span id="vtsTag">대기</span></h3>
+  <div class="vtsMeta"><span>대상 <b>T7 벌브 수차</b></span><span>러너 <b>Ø7.5m</b></span><span>총중량 <b>510 ton</b></span></div>
+  <div class="vtsMeta"><span>훈련 경과 <b id="vtsClock">00:00</b></span><span>환산 작업시간 <b id="vtsWork">0.0 h</b></span></div>
+  <ol id="vtsSteps"></ol>
+  <div id="vtsRisk"></div>
+  <div id="vtsEval"></div>
+  <button id="vtsExit">훈련 종료</button>
 </div>
 
 <div class="legend">
@@ -231,8 +570,8 @@
 
 <script type="importmap">
 { "imports": {
-  "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
-  "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+  "three": "./vendor/three.module.js",
+  "three/addons/": "./vendor/jsm/"
 }}
 </script>
 
@@ -250,6 +589,7 @@ const PLANT = {
   meanSea:5.0, periodHr:12.42, lakeArea:42e6,
 };
 const TWO_PI = Math.PI*2;
+const CFONT = "'Arial Narrow','Roboto Condensed','LG Smart','Noto Sans KR',sans-serif";
 
 // ---------- 발전 물리 모델 (node로 검증·보정: 최적 552GWh / peak 254MW) ----------
 const smooth=(a,b,x)=>{const t=Math.max(0,Math.min(1,(x-a)/(b-a)));return t*t*(3-2*t);};
@@ -282,8 +622,9 @@ function integrate(s, p, dtHr){
 
   s.power = 0; let qIn=0;
   if(s.state==='GEN' && head>0){
-    s.power = turbPow(head)*p.nTurb;
-    qIn = turbFlow(head)*p.nTurb;
+    const nT = Math.max(0, p.nTurb - (p.nOff||0));   // 정비 격리 터빈 제외 (n-1 운전)
+    s.power = turbPow(head)*nT;
+    qIn = turbFlow(head)*nT;
     s.cycE += s.power*dtHr;
   }
   s.totalMWh += s.power*dtHr;
@@ -308,6 +649,11 @@ function evalEnergy(startHead, amp){
   for(let i=0;i<steps;i++){ const d=integrate(s,p,dt); if(d>0) cyc.push(d); }
   const use = cyc.slice(1);
   return use.length>=1 ? use.reduce((a,b)=>a+b,0)/use.length : 0; // 정상상태 주기 없으면 0(저개시 붕괴)
+}
+const _sweepCache={};
+function runSweepC(amp){
+  const k=[amp.toFixed(2),P.stopHead,P.nTurb,P.nGate].join('|');
+  return _sweepCache[k]||(_sweepCache[k]=runSweep(amp));
 }
 function runSweep(amp){
   const pts=[]; let best=0,bestSh=1.0;
@@ -409,18 +755,23 @@ const matRock     = new THREE.MeshStandardMaterial({color:0x8f897c, roughness:1.
 
 // LG PRI 사인보드 텍스처 (LG 레드 페이스 심볼 + PRI)
 function makeLGTexture(){
-  const c=document.createElement('canvas'); c.width=420; c.height=120;
+  // 공식 LG 로고(심볼+워드마크, Wikimedia 2014) 이미지 로드 → 캔버스 합성 (왜곡 없는 원본 비례)
+  const c=document.createElement('canvas'); c.width=640; c.height=160;
   const x=c.getContext('2d');
-  x.fillStyle='#ffffff'; x.fillRect(0,0,420,120);
-  x.fillStyle='#A50034'; x.beginPath(); x.arc(62,60,52,0,Math.PI*2); x.fill();   // 레드 원
-  x.fillStyle='#ffffff'; x.beginPath(); x.arc(80,40,9,0,Math.PI*2); x.fill();     // 눈(점)
-  x.fillStyle='#ffffff'; x.font='bold 52px Arial'; x.textAlign='center'; x.textBaseline='middle';
-  x.fillText('LG',58,66);                                                          // LG
-  x.fillStyle='#A50034'; x.font='bold 62px Arial'; x.textAlign='left';
-  x.fillText('PRI',128,60);                                                        // PRI
-  x.fillStyle='#6b6b6b'; x.font='600 19px Arial';
-  x.fillText('DIGITAL TWIN', 130, 98);
-  const t=new THREE.CanvasTexture(c); t.anisotropy=4; return t;
+  x.fillStyle='#ffffff'; x.fillRect(0,0,640,160);
+  const t=new THREE.CanvasTexture(c); t.anisotropy=4;
+  const img=new Image();
+  img.onload=()=>{
+    x.drawImage(img, 14, 15, 285, 130.6);                    // 600:275 원본 비례 유지
+    x.fillStyle='#A50034'; x.font="bold 86px 'Arial Narrow','Roboto Condensed',Arial";
+    x.textAlign='left'; x.textBaseline='alphabetic';
+    x.fillText('PRI', 318, 96);
+    x.fillStyle='#6b6c6b'; x.font="600 25px 'Arial Narrow','Roboto Condensed',Arial";
+    x.fillText('DIGITAL TWIN · K-water 시화호', 320, 132);
+    t.needsUpdate=true;
+  };
+  img.src='./vendor/lg_logo_2014.svg';
+  return t;
 }
 
 // ====================================================================
@@ -478,6 +829,7 @@ box(TURB_SPAN+6,0.4,1,matSteelD,turbX0+TURB_SPAN/2,deckY+7.1,BZ+7);
   box(1.2,1.2,16,matYellow,gx,deckY+11.8,BZ);
 }
 // LG PRI 사인보드 (발전동 옥상, 양면)
+const lgSigns=[];
 {
   const tex=makeLGTexture();
   const signMat=new THREE.MeshStandardMaterial({map:tex,roughness:0.55,emissive:0x444444,emissiveIntensity:0.12});
@@ -486,7 +838,7 @@ box(TURB_SPAN+6,0.4,1,matSteelD,turbX0+TURB_SPAN/2,deckY+7.1,BZ+7);
     const pl=new THREE.Mesh(new THREE.PlaneGeometry(w,h),signMat);
     pl.position.set(sx,deckY+13,BZ+side*0.35);
     if(side>0) pl.rotation.y=Math.PI;
-    pl.castShadow=true; barrier.add(pl);
+    pl.castShadow=true; barrier.add(pl); lgSigns.push(pl);
   }
   box(0.5,7,0.5,matSteel,sx-12,deckY+10,BZ); box(0.5,7,0.5,matSteel,sx+12,deckY+10,BZ);
 }
@@ -711,16 +1063,18 @@ function rrect(x,a,b,w,h,r){ x.beginPath(); x.moveTo(a+r,b); x.arcTo(a+w,b,a+w,b
 const lbl=(()=>{ const c=document.createElement('canvas'); c.width=340; c.height=158;
   const t=new THREE.CanvasTexture(c);
   const s=new THREE.Sprite(new THREE.SpriteMaterial({map:t,transparent:true,depthTest:false}));
-  s.scale.set(28,13,1); s.position.set(-6,deckY+27,BZ); s.renderOrder=20; scene.add(s);
+  s.scale.set(28,13,1); s.position.set(-6,deckY+27,BZ); s.renderOrder=20;
+  s.layers.set(1); camera.layers.enable(1);          // 반사(Reflector 가상 카메라, layer 0)에서 제외
+  scene.add(s);
   return {c,t,s,last:-1}; })();
 function drawLabel(head,Q,pw,stateTxt){
   const x=lbl.c.getContext('2d'); x.clearRect(0,0,340,158);
   x.fillStyle='rgba(8,18,33,0.85)'; rrect(x,3,3,334,152,18); x.fill();
   x.strokeStyle='rgba(54,224,196,0.7)'; x.lineWidth=2.5; rrect(x,3,3,334,152,18); x.stroke();
-  x.textAlign='left'; x.fillStyle='#9fe9ff'; x.font='bold 21px sans-serif'; x.fillText(stateTxt,20,32);
-  x.fillStyle='#fff';    x.font='bold 33px sans-serif'; x.fillText('낙차 H   '+head.toFixed(2)+' m',20,72);
-  x.fillStyle='#ffd34d'; x.font='600 23px sans-serif';  x.fillText('통수량   '+Q.toLocaleString()+' ㎥/s',20,104);
-  x.fillStyle='#7fe07a'; x.font='600 23px sans-serif';  x.fillText('출력      '+pw.toFixed(0)+' MW',20,136);
+  x.textAlign='left'; x.fillStyle='#9fe9ff'; x.font='bold 21px '+CFONT; x.fillText(stateTxt,20,32);
+  x.fillStyle='#fff';    x.font='bold 33px '+CFONT; x.fillText('낙차 H   '+head.toFixed(2)+' m',20,72);
+  x.fillStyle='#ffd34d'; x.font='600 23px '+CFONT;  x.fillText('통수량   '+Q.toLocaleString()+' ㎥/s',20,104);
+  x.fillStyle='#7fe07a'; x.font='600 23px '+CFONT;  x.fillText('출력      '+pw.toFixed(0)+' MW',20,136);
   lbl.t.needsUpdate=true;
 }
 
@@ -745,7 +1099,8 @@ const slStart=bindSlider('sStart','vStart',v=>v.toFixed(1)+' m','startHead');
 const slStop =bindSlider('sStop','vStop',v=>v.toFixed(1)+' m','stopHead');
 const slTurb =bindSlider('sTurb','vTurb',v=>v+'기','nTurb');
 const slGate =bindSlider('sGate','vGate',v=>v+'문','nGate');
-const slAmp  =bindSlider('sAmp','vAmp',v=>(v*2).toFixed(1)+' m','amp',()=>{ if(chartShown) doSweep(); });
+const slAmp  =bindSlider('sAmp','vAmp',v=>(v*2).toFixed(1)+' m','amp',
+  ()=>{ if(chartShown){ clearTimeout(slAmp._t); slAmp._t=setTimeout(doSweep,250); } });
 // 속도는 P가 아니라 rt
 { const el=$('sSpeed'),v=$('vSpeed'); el.addEventListener('input',()=>{ rt.speed=+el.value; v.textContent=el.value+'×'; }); }
 
@@ -754,7 +1109,7 @@ function setMode(m){
   $('mManual').classList.toggle('on',m==='manual');
   $('mAI').classList.toggle('on',m==='ai');
   if(m==='ai'){
-    const {bestSh}=runSweep(P.amp);
+    const {bestSh}=runSweepC(P.amp);
     slStart.set(bestSh.toFixed(1));
     slStop.set(0.8); slTurb.set(10); slGate.set(8);
   }
@@ -762,7 +1117,7 @@ function setMode(m){
 $('mManual').onclick=()=>setMode('manual');
 $('mAI').onclick=()=>setMode('ai');
 $('bReset').onclick=()=>{ sim=freshState(); };
-$('bPlay').onclick=()=>{ rt.playing=!rt.playing; $('bPlay').textContent=rt.playing?'⏸ 일시정지':'▶ 재생'; };
+$('bPlay').onclick=()=>{ rt.playing=!rt.playing; $('bPlay').textContent=rt.playing?'일시정지':'재생'; };
 $('bView').onclick=()=>{ if(tour) setTour(false); camIdx=(camIdx+1)%camViews.length; applyView(camIdx); };
 $('bFull').onclick=()=>{ if(!document.fullscreenElement) document.documentElement.requestFullscreen(); else document.exitFullscreen(); };
 
@@ -771,13 +1126,16 @@ let night=false;
 function setNight(on){
   night=on;
   skyMesh.material.map = on?skyNight:skyDay; skyMesh.material.needsUpdate=true;
-  scene.environment = bakeEnv(on?skyNight:skyDay);
+  setNight._env=setNight._env||{};
+  const ek=on?'n':'d';
+  setNight._env[ek]=setNight._env[ek]||bakeEnv(on?skyNight:skyDay);
+  scene.environment = setNight._env[ek];
   sun.intensity=on?0.25:1.55; sun.color.set(on?0x9fb6ff:0xfff2dc);
   hemi.intensity=on?0.22:0.9; hemi.color.set(on?0x24406b:0xd2ebff);
   renderer.toneMappingExposure=on?1.32:1.08;
   scene.fog.color.set(on?0x0a1426:0xaecadb); scene.fog.density=on?0.0010:0.0014;
   nightLights.visible=on; stars.material.opacity=on?0.9:0;
-  $('bNight').textContent=on?'☀️ 주간':'🌙 야간';
+  $('bNight').textContent=on?'주간':'야간';
 }
 $('bNight').onclick=()=>setNight(!night);
 
@@ -789,7 +1147,7 @@ const tourTgt=new THREE.CatmullRomCurve3([
   [0,6,0],[-10,8,8],[-35,5,2],[20,4,4],[gateX0-8,34,-3],[gateX0,2,40],[0,0,0]
 ].map(a=>new THREE.Vector3(...a)),true,'catmullrom',0.4);
 let tour=false, tourS=0;
-function setTour(on){ tour=on; controls.enabled=!on; camAnim=0; $('bTour').textContent=on?'⏹ 투어 중지':'🎬 시네마틱'; }
+function setTour(on){ tour=on; controls.enabled=!on; camAnim=0; $('bTour').textContent=on?'투어 중지':'자동 투어'; }
 function updateTour(dt){ tourS=(tourS+dt*0.016)%1; camera.position.copy(tourPos.getPoint(tourS)); controls.target.copy(tourTgt.getPoint(tourS)); }
 $('bTour').onclick=()=>setTour(!tour);
 renderer.domElement.addEventListener('pointerdown',()=>{ if(tour) setTour(false); });
@@ -797,10 +1155,10 @@ renderer.domElement.addEventListener('pointerdown',()=>{ if(tour) setTour(false)
 // ---------- 최적화 차트 ----------
 let chartShown=false, lastSweep=null;
 const chart=$('optChart'), cx=chart.getContext('2d');
-$('bSweep').onclick=()=>{ chartShown=true; $('chartWrap').style.display='block'; $('bSweep').textContent='발전량 vs 개시 낙차 ↻ 재계산'; doSweep(); };
+$('bSweep').onclick=()=>{ chartShown=true; $('chartWrap').style.display='block'; $('bSweep').textContent='개시 낙차 최적화 재실행'; doSweep(); };
 $('bApply').onclick=()=>{ if(lastSweep){ slStart.set(lastSweep.bestSh.toFixed(1)); setMode('ai'); } };
 function doSweep(){
-  const res=runSweep(P.amp); lastSweep=res; drawChart(res);
+  const res=runSweepC(P.amp); lastSweep=res; drawChart(res);
   const year=res.best*1.932*365/1000;
   $('optResult').innerHTML=`현재 조차 ${(P.amp*2).toFixed(1)}m 기준 · 최적 개시낙차 <b>${res.bestSh.toFixed(1)}m</b><br>→ 주기 ${res.best.toFixed(0)}MWh · 연 환산 <b>${year.toFixed(0)} GWh</b> (목표 552 대비 ${(year/552.7*100).toFixed(0)}%)`;
 }
@@ -812,7 +1170,7 @@ function drawChart(res){
   const X=v=>padL+(v-xmin)/(xmax-xmin)*(W-padL-padR);
   const Y=v=>H-padB-(v/ymax)*(H-padT-padB);
   // 격자
-  cx.strokeStyle='rgba(255,255,255,0.08)'; cx.lineWidth=1; cx.fillStyle='#7e90a6'; cx.font='11px sans-serif';
+  cx.strokeStyle='rgba(255,255,255,0.08)'; cx.lineWidth=1; cx.fillStyle='#7e90a6'; cx.font='11px '+CFONT;
   for(let g=0;g<=4;g++){ const yv=ymax*g/4, y=Y(yv);
     cx.beginPath();cx.moveTo(padL,y);cx.lineTo(W-padR,y);cx.stroke();
     cx.textAlign='right'; cx.fillText((yv).toFixed(0), padL-6, y+4); }
@@ -824,10 +1182,10 @@ function drawChart(res){
   cx.beginPath(); res.pts.forEach((p,i)=>{ const x=X(p.sh),y=Y(p.e); i?cx.lineTo(x,y):cx.moveTo(x,y); });
   cx.lineTo(X(xmax),Y(0)); cx.lineTo(X(xmin),Y(0)); cx.closePath();
   const grad=cx.createLinearGradient(0,padT,0,H-padB);
-  grad.addColorStop(0,'rgba(54,209,196,0.35)'); grad.addColorStop(1,'rgba(54,209,196,0.02)');
+  grad.addColorStop(0,'rgba(0,185,237,0.35)'); grad.addColorStop(1,'rgba(0,185,237,0.02)');
   cx.fillStyle=grad; cx.fill();
   cx.beginPath(); res.pts.forEach((p,i)=>{ const x=X(p.sh),y=Y(p.e); i?cx.lineTo(x,y):cx.moveTo(x,y); });
-  cx.strokeStyle='#36d1c4'; cx.lineWidth=2.2; cx.stroke();
+  cx.strokeStyle='#00B9ED'; cx.lineWidth=2.2; cx.stroke();
   // 현재 설정 마커
   const cxx=X(P.startHead);
   cx.strokeStyle='rgba(255,143,174,0.9)'; cx.setLineDash([4,3]); cx.beginPath();
@@ -835,9 +1193,647 @@ function drawChart(res){
   cx.fillStyle='#ff8fae'; cx.textAlign='center'; cx.fillText('현재', cxx, padT+9);
   // 최적점 ★
   const ox=X(res.bestSh), oy=Y(res.best);
-  cx.fillStyle='#ffd34d'; cx.font='16px sans-serif'; cx.fillText('★',ox,oy-4);
-  cx.font='11px sans-serif'; cx.fillStyle='#ffe79a';
+  cx.fillStyle='#ffd34d'; cx.font='16px '+CFONT; cx.fillText('★',ox,oy-4);
+  cx.font='11px '+CFONT; cx.fillStyle='#ffe79a';
   cx.fillText('최적 '+res.bestSh.toFixed(1)+'m', ox, oy-18);
+}
+
+
+// --------- CCTV 폴 4기 + 패트롤 로봇 PR-01 (방조제 상부 도로) ---------
+const cctvPoles=[];
+for(const px of [turbX0-14, turbX0+TURB_SPAN*0.55, gateX0+GATE_SPAN*0.3, gateX0+GATE_SPAN+12]){
+  box(0.35,6.5,0.35,matSteelD,px,deckY+3.6,BZ-5.6);
+  const cam=box(1.15,0.5,0.55,matSteelD,px,deckY+6.9,BZ-5.4);
+  cam.rotation.y=0.5; cam.rotation.x=0.25;
+  const led=new THREE.Mesh(new THREE.SphereGeometry(0.13,8,8),
+    new THREE.MeshStandardMaterial({color:0xff4444,emissive:0xff2222,emissiveIntensity:1.4}));
+  led.position.set(px+0.5,deckY+7.15,BZ-5.35); barrier.add(led);
+  cctvPoles.push(px);
+}
+const robot=new THREE.Group();
+{
+  const bodyM=new THREE.MeshStandardMaterial({color:0xf2b705,roughness:0.5,metalness:0.3});
+  const body=new THREE.Mesh(new THREE.BoxGeometry(1.7,0.75,1.15),bodyM); body.position.y=0.65; body.castShadow=true; robot.add(body);
+  const cab=new THREE.Mesh(new THREE.BoxGeometry(0.9,0.45,0.95),matSteelD); cab.position.set(-0.2,1.2,0); robot.add(cab);
+  for(const [wx,wz] of [[-0.55,0.62],[0.55,0.62],[-0.55,-0.62],[0.55,-0.62]]){
+    const w=new THREE.Mesh(new THREE.CylinderGeometry(0.3,0.3,0.2,14),new THREE.MeshStandardMaterial({color:0x222831}));
+    w.rotation.x=Math.PI/2; w.position.set(wx,0.3,wz); robot.add(w);
+  }
+  const mast=new THREE.Mesh(new THREE.CylinderGeometry(0.05,0.05,0.9,8),matSteel); mast.position.set(0.45,1.75,0); robot.add(mast);
+  const beacon=new THREE.Mesh(new THREE.SphereGeometry(0.16,10,10),
+    new THREE.MeshStandardMaterial({color:0x37c9f2,emissive:0x00B9ED,emissiveIntensity:1.2}));
+  beacon.position.set(0.45,2.25,0); robot.add(beacon); robot.userData.beacon=beacon;
+  robot.position.set(turbX0+10,deckY+0.6,BZ+2.2); barrier.add(robot);
+}
+
+// --------- VTS 분해점검 3D 리그 (크레인·러너 어셈블리·루프 해치·정비 베이) ---------
+const VTS_TX = turbX0+TURB_PITCH*6.5;          // T7 위치
+const VTS_BAY = turbX0-26;                      // 정비 베이 (서측 데크)
+const vtsRig = {};
+{
+  const g = new THREE.Group(); g.visible=false; barrier.add(g); vtsRig.g=g;
+  const hatch = box(9,0.7,11,matConcreteD,VTS_TX,deckY+7.75,BZ,g); vtsRig.hatch=hatch;
+  const crane = new THREE.Group(); g.add(crane); vtsRig.crane=crane;
+  const beamY = deckY+15.5;
+  box(1.4,1.4,BARRIER_W+10,matYellow,0,beamY,0,crane);
+  for(const s of [-1,1]){
+    box(0.9,beamY-deckY,0.9,matSteelD,0,(beamY+deckY)/2,s*(BARRIER_W/2+4.4),crane);
+    box(2.6,0.7,1.3,matYellow,0,deckY+0.6,s*(BARRIER_W/2+4.4),crane);
+  }
+  const trolley = box(2.2,1.1,2.2,matSteelD,0,beamY-1.2,0,crane);
+  const cableM = new THREE.Mesh(new THREE.CylinderGeometry(0.09,0.09,1,8),matSteelD);
+  cableM.position.set(0,beamY-2,0); crane.add(cableM); vtsRig.cable=cableM;
+  const hook = new THREE.Group(); crane.add(hook); vtsRig.hook=hook;
+  const hookM = box(1.5,0.5,1.5,matYellow,0,0,0,hook);
+  hook.position.set(0,deckY+11,0);
+  crane.position.set(VTS_TX,0,BZ);
+  // 러너 어셈블리 — 실물 CAD 기반 벌브 수차
+  const asm = new THREE.Group(); g.add(asm); vtsRig.asm=asm;
+  const matBulb  = new THREE.MeshStandardMaterial({color:0x8fae9b,roughness:0.42,metalness:0.28});
+  const matBulbD = new THREE.MeshStandardMaterial({color:0x74957f,roughness:0.5,metalness:0.3});
+  const matFlange= new THREE.MeshStandardMaterial({color:0xb9c3cc,roughness:0.35,metalness:0.75});
+  const bulb = new THREE.Mesh(new THREE.CylinderGeometry(1.35,1.35,3.2,22),matBulb);
+  bulb.rotation.z=Math.PI/2; bulb.position.x=2.2; asm.add(bulb);
+  const cap = new THREE.Mesh(new THREE.SphereGeometry(1.35,20,14),matBulb);
+  cap.scale.x=0.62; cap.position.x=3.8; asm.add(cap);
+  box(2.0,0.42,1.7,matFlange,2.3,1.72,0,asm);
+  box(0.75,0.55,0.75,matBulbD,1.15,1.9,0,asm);
+  for(const fx of [0.85,2.2,3.35]){
+    const fl=new THREE.Mesh(new THREE.TorusGeometry(1.4,0.09,10,30),matFlange);
+    fl.rotation.y=Math.PI/2; fl.position.x=fx; asm.add(fl);
+  }
+  const cone1 = new THREE.Mesh(new THREE.CylinderGeometry(0.95,1.35,1.5,20),matSteel);
+  cone1.rotation.z=Math.PI/2; cone1.position.x=-0.15; asm.add(cone1);
+  const boltR = new THREE.Mesh(new THREE.TorusGeometry(1.0,0.07,8,26),matFlange);
+  boltR.rotation.y=Math.PI/2; boltR.position.x=-0.92; asm.add(boltR);
+  const shaft = new THREE.Mesh(new THREE.CylinderGeometry(0.5,0.5,1.3,14),matSteel);
+  shaft.rotation.z=Math.PI/2; shaft.position.x=-1.55; asm.add(shaft);
+  const nose = new THREE.Mesh(new THREE.ConeGeometry(1.15,2.3,18),matSteel);
+  nose.rotation.z=-Math.PI/2; nose.position.x=-3.3; asm.add(nose); vtsRig.nose=nose;
+  const bladeMat2=new THREE.MeshStandardMaterial({color:0x9fb2c2,metalness:0.72,roughness:0.32,side:THREE.DoubleSide});
+  vtsRig.blades=[];
+  for(let b=0;b<4;b++){
+    const arm=new THREE.Group();
+    const bl=new THREE.Mesh(new THREE.BoxGeometry(0.45,3.1,1.55),bladeMat2);
+    bl.position.y=2.2; bl.rotation.x=0.55; arm.add(bl);
+    arm.rotation.x=b*Math.PI/2; arm.position.x=-2.2; asm.add(arm);
+    vtsRig.blades.push({arm,home:{rx:b*Math.PI/2,px:-2.2}});
+  }
+  const oldBr = new THREE.Mesh(new THREE.TorusGeometry(0.88,0.26,10,26),
+    new THREE.MeshStandardMaterial({color:0x8a4a4a,emissive:0xE03131,emissiveIntensity:0}));
+  oldBr.rotation.y=Math.PI/2; oldBr.position.x=-1.55; asm.add(oldBr); vtsRig.oldBr=oldBr;
+  const newBr = new THREE.Mesh(new THREE.TorusGeometry(0.88,0.26,10,26),
+    new THREE.MeshStandardMaterial({color:0x5FB351,emissive:0x2D6A2D,emissiveIntensity:0.4}));
+  newBr.rotation.y=Math.PI/2; newBr.visible=false; g.add(newBr); vtsRig.newBr=newBr;
+  asm.position.set(VTS_TX,1.0,BZ);
+  window.__vtsRig=vtsRig;
+  box(16,0.35,12,matConcreteD,VTS_BAY,deckY+0.5,BZ,g);
+  box(1.6,1.5,7,matSteelD,VTS_BAY-2.6,deckY+1.4,BZ,g);
+  box(1.6,1.5,7,matSteelD,VTS_BAY+2.6,deckY+1.4,BZ,g);
+  for(const [cx,cz] of [[-7,-5],[7,-5],[-7,5],[7,5]]){
+    const cone=new THREE.Mesh(new THREE.ConeGeometry(0.4,1.1,10),
+      new THREE.MeshStandardMaterial({color:0xff7a1a}));
+    cone.position.set(VTS_BAY+cx,deckY+1.1,BZ+cz); g.add(cone);
+  }
+}
+
+// ====================================================================
+//  운영 지능 모듈 — DOS 통합 관제 · 예지보전 · AI Agent 자율 루프 · VC 인터록
+//  PPT 매핑: 본다(DOS) / 검증한다(VC) / 기억한다(이력→지식화) / 판단한다(8단계 루프+HITL)
+// ====================================================================
+P.nOff=0;
+const pdm={ offline:new Set(), alarm:new Set(), fault:null, acc:97.2, lossA:0, lossB:0 };
+// 위기경보 색: 정상=#5FB351(K-water 그린) · 주의=#FF9933(K-water 오렌지) · 경계=#F2701A(오렌지 명도 파생) · 심각=#E03131(표준 알람)
+const CRISIS=['관심','주의','경계','심각'], CRISIS_C=['#5FB351','#FF9933','#F2701A','#E03131'];
+
+// ---------- 운영 이력 로그 (기억한다 — KKS 태그 → 지식그래프) ----------
+const opsLog=[];
+function logOps(tag,msg,cls){
+  const d=Math.floor(sim.t/24), h=Math.floor(sim.t%24), m=Math.floor(sim.t*60%60);
+  opsLog.unshift({t:`D${d} ${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}`,tag,msg,cls:cls||''});
+  if(opsLog.length>6) opsLog.pop();
+  const el=$('loopLog');
+  if(el) el.innerHTML='<div class="sec" style="margin:9px 0 3px">운영 이력 → KKS 지식그래프 적재</div>'+
+    opsLog.map(e=>`<div class="logline ${e.cls}"><span>${e.t}</span><b>[${e.tag}]</b> ${e.msg}</div>`).join('');
+}
+
+// ---------- 터빈 상태 스트립 ----------
+{ const strip=$('turbstrip');
+  for(let i=0;i<PLANT.nTurbines;i++){ const s=document.createElement('span');
+    s.className='tchip'; s.id='tc'+i; s.textContent='T'+(i+1); strip.appendChild(s); } }
+function stripTick(){
+  turbines.forEach((tb,i)=>{ const c=$('tc'+i); if(!c) return;
+    c.className='tchip '+(pdm.alarm.has(i)?'alarm':pdm.offline.has(i)?'off':(tb.on?'on':'')); });
+}
+
+// ---------- DOS 통합 관제 ----------
+let dosAcc=99;
+function dosTick(dt){
+  dosAcc+=dt; if(dosAcc<0.45) return; dosAcc=0;
+  const d=Math.floor(sim.t/24), h=Math.floor(sim.t%24), m=Math.floor(sim.t*60%60);
+  $('dosClock').textContent=`D${d} ${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}`;
+  $('dGen').textContent=sim.power.toFixed(0)+' MW';
+  $('dWq').textContent=(7.9+0.5*Math.sin(sim.t*0.51)+0.15*Math.sin(sim.t*2.3)).toFixed(1)+' ㎎/L';
+  const surge=(sim.sea-PLANT.meanSea)/(P.amp||3.3);
+  let lv=0; if(P.amp>3.8&&surge>0.88) lv=2; else if(surge>0.94) lv=1;
+  if(pdm.alarm.size) lv=Math.max(lv,1);
+  $('dFld').textContent=CRISIS[lv];
+  $('crisisLv').textContent=CRISIS[lv]; $('crisisLv').style.color=CRISIS_C[lv];
+  $('dSaf').textContent=pdm.offline.size?'정비작업 1건 (허가)':'작업 0건';
+  $('dLed0').className='led ok';
+  $('dLed1').className='led ok';
+  $('dLed2').className='led '+(lv===0?'ok':lv===1?'warn':'bad');
+  $('dLed3').className='led '+(pdm.alarm.size?'bad':pdm.offline.size?'warn':'ok');
+  $('shadowPct').textContent=(99.0+0.35*Math.sin(sim.t*0.7)).toFixed(1)+'%';
+  // 전역 발전소 상태 필 (3초 파악용)
+  const ps=$('plantStatus');
+  if(pdm.alarm.size){ ps.className='ps bad'; ps.textContent='이상 감지 · T7 점검'; }
+  else if(pdm.offline.size){ ps.className='ps warn'; ps.textContent='계획 정비 중 · 9기 운전'; }
+  else if(lv>=2){ ps.className='ps bad'; ps.textContent='위기경보 '+CRISIS[lv]; }
+  else if(lv===1){ ps.className='ps warn'; ps.textContent='위기경보 주의'; }
+  else { ps.className='ps ok'; ps.textContent='정상 운전'; }
+}
+
+// ---------- 시나리오 배너 ----------
+function banner(msg,sub,cls,ms=4200){
+  const el=$('scenario'); el.className='hud '+(cls||'');
+  const d=Math.floor(sim.t/24), h=Math.floor(sim.t%24), m=Math.floor(sim.t*60%60);
+  el.innerHTML=`<span style="opacity:.55;font-size:11px;font-weight:600">D${d} ${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}</span> ${msg}`+(sub?`<small>${sub}</small>`:'');
+  el.style.display='block';
+  banner._hideAt = ms>0 ? simClock+ms/1000 : 0;
+}
+// 프레임 클록 스케줄러 — REC 모드에서도 결정론 보장, 시퀀스 취소 가능
+let simClock=0;
+const loopPending=[], demoPending=[];
+function later(fn,ms){ loopPending.push({at:simClock+ms/1000,fn}); }
+function laterDemo(fn,ms){ demoPending.push({at:simClock+ms/1000,fn}); }
+function clearLoopTimers(){ loopPending.length=0; }
+function clearDemoTimers(){ demoPending.length=0; }
+function pumpTimers(){
+  for(const q of [loopPending,demoPending]){
+    for(let i=0;i<q.length;){
+      if(q[i].at<=simClock){ const f=q[i].fn; q.splice(i,1); f(); } else i++;
+    }
+  }
+  if(banner._hideAt && simClock>=banner._hideAt){ $('scenario').style.display='none'; banner._hideAt=0; }
+}
+
+// ---------- 8단계 자율 운영 루프 (판단한다 · HITL) ----------
+const LOOP_STEPS=[
+ ['01 이상 탐지','센서·트윈 편차 상시 감지','AI'],
+ ['02 원인 분석','15년 정비이력·연관 데이터 추론','AI'],
+ ['03 조치 추천','규정·과거 대응 기반 조치안 생성','AI'],
+ ['04 트윈 검증','조치안 영향 사전 시뮬레이션','AI'],
+ ['05 운영자 승인','근거 검토 후 실행 결정','사람'],
+ ['06 조치 실행','승인 조치를 현장·트윈 반영','시스템'],
+ ['07 결과 기록','운영·정비 이력 자동 기록','시스템'],
+ ['08 재학습','승인 결과 학습 → 정확도 향상','AI'],
+];
+$('loopSteps').innerHTML=LOOP_STEPS.map((s,i)=>
+  `<li id="ls${i}"><i></i><div><b>${s[0]}</b><em>${s[2]}</em><span>${s[1]}</span><div class="lsx" id="lsx${i}"></div></div></li>`).join('');
+function setStep(i,state,note){
+  const li=$('ls'+i); if(!li) return; li.className=state||'';
+  if(note!==undefined) $('lsx'+i).innerHTML=note;
+}
+function resetLoop(){ for(let i=0;i<8;i++) setStep(i,'',''); $('loopVerify').innerHTML=''; $('loopActions').style.display='none'; }
+
+function injectFault(){
+  if(pdm.fault) return;
+  clearLoopTimers();                       // 이전 시퀀스 잔여 콜백 제거 (재주입 soft-lock 방지)
+  pdm.fault={unit:6,phase:0,approved:false};
+  pdm.alarm.add(6);
+  $('loop').classList.add('show'); resetLoop();
+  $('loopTag').textContent='가동'; $('loopTag').className='live';
+  banner('이상 탐지: 수차 T7 (SHW-TB-07)','가이드베어링 진동 2.1→4.7㎜/s 상승 · 트윈-실측 편차 +18%','warn',5200);
+  logOps('SHW-TB-07','진동 상한 접근 — 트윈 편차 이상 탐지','warn');
+  setStep(0,'run','진동 4.7㎜/s (상한 4.5) · 편차 +18%');
+  later(()=>{ setStep(0,'done'); setStep(1,'run','15년 이력 1,247건 유사도 검색…'); },1700);
+  later(()=>{ setStep(1,'done','유사사례 3건 — 2019 T3 가이드베어링 마모 패턴 92% 일치');
+              setStep(2,'run','조치안 생성…'); },3500);
+  later(()=>{ setStep(2,'done','권고: 소조기 계획 정지 후 베어링 점검(약 4h)');
+              setStep(3,'run','트윈에서 조치안 A/B 발전량 영향 시뮬레이션…'); },5000);
+  later(verifyOptions,5900);
+}
+
+function evalEnergyN(startHead,amp,nT){
+  // evalEnergy와 동일 로직 — 가동 대수만 명시 (트윈 검증용)
+  const p={amp,startHead,stopHead:P.stopHead,nTurb:nT,nGate:P.nGate};
+  const s=freshState(); const dt=0.01, steps=Math.round(PLANT.periodHr*10/dt); const cyc=[];
+  for(let i=0;i<steps;i++){ const d=integrate(s,p,dt); if(d>0) cyc.push(d); }
+  const u=cyc.slice(1);
+  return u.length?u.reduce((a,b)=>a+b,0)/u.length:0;
+}
+function verifyOptions(){
+  // ④ 트윈 검증 — 실제 물리모델(integrate)로 조치안별 발전량 영향을 정량 계산
+  const n=P.nTurb, nM=Math.max(1,n-1);
+  const eBase=evalEnergyN(P.startHead,P.amp,n);
+  const eAlt =evalEnergyN(P.startHead,P.amp,nM);
+  const perDay=1.932;
+  pdm.lossA=Math.max(0,(eBase-eAlt)*perDay*0.5/1000);  // A안: 소조기 반일 n-1 운전
+  pdm.lossB=eBase*perDay/1000;                          // B안: 방치 → 돌발정지 1일 전체 손실
+  setStep(3,'done',`${n}기 ${eBase.toFixed(0)}MWh vs ${nM}기 ${eAlt.toFixed(0)}MWh /주기 — Shadow 교차검증 일치`);
+  $('loopVerify').innerHTML=
+   `<div class="vbox">
+      <div class="vrow"><span>A안 — 소조기 계획정비(반일)</span><b class="good">−${pdm.lossA.toFixed(2)} GWh</b></div>
+      <div class="vrow"><span>B안 — 방치 시 돌발정지(1일)</span><b class="badv">−${pdm.lossB.toFixed(2)} GWh</b></div>
+      <div class="vsum">권고: A안 채택 시 손실 <b>${(pdm.lossB-pdm.lossA).toFixed(2)} GWh 회피</b> (트윈 물리모델 실계산)</div>
+    </div>`;
+  setStep(4,'run','운영자 승인 대기 — HITL');
+  $('loopActions').style.display='flex';
+  $('loopTag').textContent='승인 대기';
+}
+
+function approve(auto){
+  if(!pdm.fault || pdm.fault.approved) return;
+  pdm.fault.approved=true;
+  $('loopActions').style.display='none';
+  setStep(4,'done',auto?'승인 완료 (자동 데모)':'운영자 승인 완료');
+  logOps('HITL',(auto?'[자동데모] ':'')+'A안 승인 — 소조기 계획정비 확정','');
+  setStep(5,'run','T7 격리 · 정비 착수…');
+  later(()=>{
+    pdm.alarm.delete(6); pdm.offline.add(6); P.nOff=1;
+    setStep(5,'done','T7 격리 — 9기 운전 전환 (발전 연속성 유지)');
+    banner('T7 계획 정비 착수: 9기 운전 전환','작업허가 W-0712 발급 · 발전 중단 없음','info',4200);
+    logOps('SHW-TB-07','계획 정지 — 베어링 점검 착수 (작업허가 W-0712)','');
+    setStep(6,'run','이력 기록 중…');
+  },1900);
+  later(()=>{ setStep(6,'done','정비이력 [MNT-2607-041] 기록 — 지식그래프 적재'); setStep(7,'run','재학습…'); },3500);
+  later(()=>{
+    pdm.acc=Math.min(99.5,pdm.acc+0.4);
+    setStep(7,'done',`추천 정확도 ${pdm.acc.toFixed(1)}% (+0.4%p)`);
+    $('loopTag').textContent='루프 완료'; $('loopTag').className='done';
+    logOps('AI','승인 결과 재학습 — 추천 정확도 '+pdm.acc.toFixed(1)+'%','good');
+  },5100);
+  later(()=>{
+    pdm.offline.delete(6); P.nOff=0; pdm.fault=null;
+    banner('T7 정비 완료: 10기 운전 복귀','베어링 교체 · 진동 1.8㎜/s 정상 범위','ok',4200);
+    logOps('SHW-TB-07','정비 완료 — 10기 운전 복귀 (진동 1.8㎜/s)','good');
+    later(()=>{ $('loop').classList.remove('show'); resetLoop();
+                $('loopTag').textContent='대기'; $('loopTag').className=''; },3200);
+  },15000);
+}
+$('bApprove').onclick=()=>approve(false);
+$('bReject').onclick=()=>{
+  setStep(4,'done','보류 — 감시 강화 모드'); $('loopActions').style.display='none';
+  logOps('HITL','조치 보류 — 모니터링 지속','warn');
+  later(()=>{ pdm.alarm.delete(6); pdm.fault=null;
+              $('loop').classList.remove('show'); resetLoop();
+              $('loopTag').textContent='대기'; $('loopTag').className=''; },3000);
+};
+$('bFault').onclick=injectFault;
+
+// ---------- VC 인터록 — MCC 시퀀스 사전 검증 (검증한다) ----------
+function guard(action,st){
+  if(action==='OPEN_GATE'  && st==='GEN')       return '발전 중 수문 개방 금지 — 역류·수격 위험';
+  if(action==='OPEN_GATE'  && st==='WAIT')      return '낙차 축적 중 개방 금지 — 발전 기회 상실';
+  if(action==='START_TURB' && st==='SLUICE')    return '배수 중 터빈 기동 금지 — 무낙차 공회전';
+  if(action==='START_TURB' && st==='WAIT_HIGH') return 'Standstill 확인 전 재기동 금지';
+  return null;
+}
+const VC_CASES=[
+ {a:'START_TURB',st:'WAIT',     d:'낙차 축적 → 발전 개시',        expectBlock:false},
+ {a:'OPEN_GATE', st:'GEN',      d:'발전 중 수문 개방 시도',       expectBlock:true},
+ {a:'START_TURB',st:'SLUICE',   d:'배수 중 터빈 기동 시도',       expectBlock:true},
+ {a:'OPEN_GATE', st:'WAIT_HIGH',d:'만조 정체 → 배수 개방',        expectBlock:false},
+ {a:'OPEN_GATE', st:'WAIT',     d:'낙차 축적 중 수문 개방 시도',  expectBlock:true},
+ {a:'START_TURB',st:'WAIT_HIGH',d:'정체 중 터빈 재기동 시도',     expectBlock:true},
+];
+$('bVC').onclick=()=>{
+  let nPass=0;
+  const rows=VC_CASES.map(c=>{
+    const blocked=!!guard(c.a,c.st), pass=(blocked===c.expectBlock); if(pass) nPass++;
+    return `<div class="vcrow ${pass?'p':'f'}"><span>${c.d}</span><b>${blocked?'차단':'허용'}</b><em>${pass?'PASS':'FAIL'}</em></div>`;
+  }).join('');
+  $('vcWrap').innerHTML=
+   `<div class="vchead">MCC 시퀀스 인터록 검증 — ${nPass}/${VC_CASES.length} PASS · 점검정비 핸드북 준거</div>${rows}
+    <div class="vcfoot">Standstill → Turbine → Line → Reverse 순서 강제 · SCADA(안드리츠) 읽기 전용 원칙</div>`;
+  logOps('VC','인터록 시퀀스 검증 '+nPass+'/'+VC_CASES.length+' PASS','good');
+  banner('VC 시퀀스 검증: '+nPass+'/'+VC_CASES.length+' PASS','제어 로직을 가동 전 트윈에서 사전 검증','ok',3800);
+};
+$('bViol').onclick=()=>{
+  const r=guard('OPEN_GATE',sim.state);
+  if(r){ banner('인터록 차단: 수문 개방 거부',r+' · MCC 시퀀스 위반','block',5200);
+         logOps('VC','수문 개방 요청 차단 — '+r,'bad'); }
+  else { banner('인터록 통과: 수문 개방 허용','현재 상태('+sim.state+') 시퀀스 적합','ok',3800);
+         logOps('VC','수문 개방 허용 — 시퀀스 적합','good'); }
+};
+
+// ---------- 데모 시나리오 자동 진행 (발표·녹화용 스토리라인) ----------
+let autoRun=false;
+$('bAuto').onclick=()=>{
+  if(autoRun){                                  // 재클릭 = 데모 중지
+    clearDemoTimers(); autoRun=false; setTour(false);
+    setCCTV(false); $('agentWin').classList.remove('show');
+    $('bAuto').textContent='데모 시나리오 자동 진행 (전 씬)';
+    $('scenario').style.display='none'; return;
+  }
+  autoRun=true; rt.playing=true; $('bPlay').textContent='일시정지';
+  $('bAuto').textContent='자동 데모 중지 — 진행 중';
+  const T=(fn,s)=>laterDemo(fn,s*1000);
+  banner('자율 조력 발전소 데모 시작','본다: 트윈 통합 조감 (DOS 관제)','info',4000);
+  setTour(true);
+  T(()=>{ setTour(false); applyView(2,true);
+          banner('검증한다: 발전량 최적화','개시 낙차 자동 스윕 → 최적점 적용','info',3800);
+          $('bSweep').click(); },13);
+  T(()=>{ $('bApply').click(); },17);
+  T(()=>{ banner('검증한다: VC 인터록','MCC 시퀀스 6케이스 자동 검증','info',3200); $('bVC').click(); },22);
+  T(()=>{ $('bViol').click(); },26);
+  T(()=>{ banner('본다: CCTV·패트롤 로봇','방조제 전역 4채널 실영상 감시 + 협소구역 순찰 (PR-01)','info',3600);
+          setCCTV(true); },30);
+  T(()=>{ setCCTV(false); },48);
+  T(()=>{ banner('판단한다: 부서별 AI Agent 6종','5개 과 + 공통 — 유첨 요구사항 전량 대응','info',3600);
+          openAgent('ops'); },50);
+  T(()=>{ openAgent('einsp'); },57);
+  T(()=>{ $('agentWin').classList.remove('show'); applyView(0,true);
+          banner('기억·판단한다: 예지보전 → 자율 루프','이상 탐지부터 재학습까지 8단계','info',4200);
+          injectFault(); },64);
+  T(()=>{ if($('loopActions').style.display!=='none') approve(true); },76);
+  T(()=>{ banner('데모 종료','사람은 승인만 — 나머지는 AI·시스템이 자동 순환','info',5600);
+          autoRun=false; $('bAuto').textContent='데모 시나리오 자동 진행 (전 씬)'; },95);
+};
+
+// ---------- AI Agent 콘솔 (유첨 3~8 부서별 요구사항 시나리오) ----------
+const AGENTS={
+ ops:{t:'조력발전과',qs:[
+  {q:'다음 주 정비 최적 시점은?',a:'정비일정 Agent — 조석·기상·작업계획 통합 분석 결과입니다.',
+   card:['권고: 7/16(목) 09:00~15:00 — 소조기 배치·대조기 회피','예상 발전 손실 −0.03 GWh (트윈 검증 일치)','작업 충돌 없음 · 크레인 가용 확인','근거: 조위예보 · 작업계획 12건 · 점검정비 핸드북']},
+  {q:'T7 유사 고장 조치법은?',a:'15년 고장이력 1,247건에서 유사사례 3건을 검색했습니다.',
+   card:['2019 T3 가이드베어링 마모 (유사도 92%) — 베어링 교체 4h','2016 T8 진동 상승 (81%) — 얼라인먼트 보정','2013 T2 윤활 이상 (77%) — 윤활유 교체','조치 절차서 [MNT-STD-014] 자동 첨부']},
+  {q:'재정 집행 현황은?',a:'개대체 예산 집행 현황입니다 (TIMS 연동).',
+   card:['집행률 81.2% · 기성률 78.4%','선급금 지급률 92% · 잔여 예산 4.3억','이상 항목 없음']}]},
+ mech:{t:'기계설비과',qs:[
+  {q:'수차 개대체 발주서류 초안 작성해줘',a:'설계기준·계약규정·과거 발주서 학습 기반으로 초안 3건을 생성했습니다.',
+   card:['내역서 (47항목) — 표준양식 v4.2','시방서 — KKS 태그 자동 인용 128건','구매규격 결정의견서 초안','담당자 검토 후 확정 (HITL)']},
+  {q:'내일 수문 정비 위험성평가',a:'작업유형·설비정보 매칭 — 위험요인 7건을 도출했습니다.',
+   card:['고소 2 · 협착 2 · 감전 1 · 수몰 1 · 중량물 1','위험성평가표 + TBM 자료 + 작업허가서 초안 생성','유사 사고사례 2건 자동 첨부']}]},
+ elec:{t:'전기설비과',qs:[
+  {q:'이번 주 공람문서 정리해줘',a:'공람 12건을 자동 분류·요약했습니다.',
+   card:['발주 4 · 안전 3 · 지침 개정 2 · 기타 3','현장 영향 2건: 정전작업 절차 개정 — To-do 등록','사진대지 3건 자동 생성 (현장 사진 41매)']},
+  {q:'발주서류 초안 부탁해',a:'전기설비 발주서류 초안을 생성했습니다.',
+   card:['내역서·시방서 초안 — 계약규정 v3.1 반영','SCADA(안드리츠) 연계 사양 읽기 전용 명기','검토 요청 상신 대기 (HITL)']}]},
+ minsp:{t:'기계점검계획과',qs:[
+  {q:'오늘 아침회의 회의록',a:'STT 인식·요약으로 회의록을 자동 작성·공유했습니다.',
+   card:['참석 6명 · 안건 4건 · 12분','To-do 4건 배정 (담당·기한 자동 태깅)','구두 안전보고 1건 → 표준 보고서 변환']},
+  {q:'이번 달 점검일정 편성해줘',a:'작업·기상·발전운영을 반영해 점검일정을 편성했습니다.',
+   card:['점검 28건 — 소조기 집중 배치','대조기(7/22~24) 작업 0건 — 발전 우선','일정 충돌 2건 자동 조정']}]},
+ einsp:{t:'전기계측점검과',qs:[
+  {q:'풀출력 열화상 점검 결과는?',a:'열화상 AI 분석 — 과열점 1건을 검출했습니다.',
+   card:['T7 가이드베어링부 +14.2℃ (기준 +8℃ 초과)','예지보전 모델 연동 — DOS 경보 발령','점검 권고: 소조기 계획 정지 시 병행']},
+  {q:'점검 스케줄 알려줘',a:'전기계측 점검일정입니다.',
+   card:['금주 계측기 교정 6건 · 열화상 순회 2회','풀출력 구간(대조기) 열화상 촬영 자동 배정']}]},
+ com:{t:'공통',qs:[
+  {q:'영수증 전표 처리해줘',a:'OCR 인식 12건 — 회계 전표를 자동 기표했습니다.',
+   card:['법인카드 9 · 세금계산서 3','계정과목 자동 분류 (정확도 98.1%)','결재 상신 대기 2건 (HITL)']},
+  {q:'본사 공람 리스크 검토',a:'공람 2건의 현장 영향을 분석했습니다.',
+   card:['안전규정 개정 — 수문 작업허가 절차 1단계 추가','예산지침 변경 — 개대체 이월 한도 영향 검토 필요']}]},
+};
+let agKey='ops';
+{ const tabs=$('agTabs');
+  for(const k in AGENTS){ const b=document.createElement('button'); b.textContent=AGENTS[k].t;
+    b.id='agt_'+k; b.onclick=()=>openAgent(k); tabs.appendChild(b); } }
+function agMsg(cls,html){ const d=document.createElement('div'); d.className=cls; d.innerHTML=html;
+  $('agChat').appendChild(d); $('agChat').scrollTop=99999; return d; }
+function agAsk(k,i){
+  const qa=AGENTS[k].qs[i]; if(!qa) return;
+  agMsg('agQ',qa.q);
+  const ty=agMsg('agTyping',AGENTS[k].t+' Agent 분석 중…');
+  later(()=>{
+    ty.remove();
+    agMsg('agA',`<div class="who">${AGENTS[k].t.toUpperCase()} AGENT · EXAONE</div>${qa.a}`+
+      `<div class="agCard">${qa.card.map(c=>'<div>· '+c+'</div>').join('')}</div>`);
+    logOps('Agent',AGENTS[k].t+' — "'+qa.q+'" 응답 완료','good');
+  },1400);
+}
+function openAgent(k){
+  agKey=k; $('agentWin').classList.add('show');
+  for(const kk in AGENTS) $('agt_'+kk).classList.toggle('on',kk===k);
+  $('agChat').innerHTML='';
+  $('agChips').innerHTML=AGENTS[k].qs.map((q,i)=>`<button onclick="window.__agAsk('${k}',${i})">${q.q}</button>`).join('');
+  later(()=>agAsk(k,0),300);
+}
+window.__agAsk=(k,i)=>agAsk(k,i);
+$('bAgent').onclick=()=>openAgent(agKey);
+$('agClose').onclick=()=>$('agentWin').classList.remove('show');
+
+// ---------- CCTV 통합 감시 — 실사 VMS 월 ----------
+let cctvOn=false, cctvT=0, cctvEvent=0;
+let robotDir=1, robotSpeed=3.2, robotTarget=null;
+function setCCTV(on){
+  cctvOn=on; $('cctv').classList.toggle('show',on);
+  if(on){
+    if(tour) setTour(false);
+    cctvT=0; cctvEvent=0;
+    $('vt2').classList.remove('alert'); $('va2').style.display='none';
+    $('vb2').classList.remove('ok'); $('vb2').textContent='접근 감지 — PR-01 출동';
+    banner('CCTV 통합 감시 개시','방조제 전역 4채널 실영상 · AI 객체분석 · 패트롤 로봇 PR-01 연동','info',3500);
+    logOps('CCTV','통합 감시 모드 — 4채널 + PR-01 순찰','');
+  } else { robotTarget=null; robotSpeed=3.2; $('prState').textContent='방조제 순찰 중'; }
+}
+$('bCCTV').onclick=()=>setCCTV(!cctvOn);
+$('cctvExit').onclick=()=>setCCTV(false);
+addEventListener('keydown',e=>{ if(e.key==='Escape'&&cctvOn) setCCTV(false); });
+function cctvTick(d){
+  if(!cctvOn) return;
+  cctvT+=d;
+  const dd=Math.floor(sim.t/24),hh=Math.floor(sim.t%24),mm2=Math.floor(sim.t*60%60),ss=Math.floor(sim.t*3600%60);
+  const ts=`D${dd} ${String(hh).padStart(2,'0')}:${String(mm2).padStart(2,'0')}:${String(ss).padStart(2,'0')}`;
+  for(let i=0;i<4;i++){ const el=$('ts'+i); if(el) el.textContent=ts; }
+  if(cctvEvent===0 && cctvT>8){
+    cctvEvent=1;
+    $('vt2').classList.add('alert'); $('va2').style.display='block';
+    banner('접근 감지: 수문부 협소구역 (CAM-03)','AI 객체분석 — 선박 접근 추정 (신뢰도 91%) · PR-01 출동','warn',5000);
+    logOps('CCTV','CAM-03 접근 감지 (AI 신뢰도 91%) — PR-01 출동 지시','warn');
+    robotTarget=gateX0+GATE_SPAN*0.55; robotSpeed=11; $('prState').textContent='출동 중 — 수문부 협소구역';
+  }
+  if(cctvEvent===1 && robotTarget!==null && Math.abs(robot.position.x-robotTarget)<2){
+    cctvEvent=2;
+    $('vb2').classList.add('ok'); $('vb2').textContent='현장 확인 — 상황 종결';
+    $('va2').style.display='none';
+    banner('현장 확인 완료: 조업 어선 (안전거리 이탈 없음)','PR-01 현장 영상 전송 · 상황 종결 — 이력 기록','ok',4600);
+    logOps('CCTV','PR-01 현장 확인 — 상황 종결·이력 기록','good');
+    robotTarget=null; robotSpeed=3.2; $('prState').textContent='순찰 복귀';
+  }
+  if(cctvEvent===2 && cctvT>22){ $('vt2').classList.remove('alert'); }
+}
+function robotTick(d){
+  const r=robot; if(!r) return;
+  if(vtsOn){ r.userData.beacon.material.emissiveIntensity=0.4; return; }
+  r.userData.beacon.material.emissiveIntensity=0.7+Math.abs(Math.sin(simClock*5))*1.1;
+  const xmin=turbX0-16, xmax=gateX0+GATE_SPAN+10;
+  if(robotTarget!==null){
+    const dir=Math.sign(robotTarget-r.position.x)||1;
+    r.position.x+=dir*robotSpeed*d; r.rotation.y=dir>0?0:Math.PI;
+  } else {
+    r.position.x+=robotDir*robotSpeed*d;
+    if(r.position.x>xmax){ robotDir=-1; r.rotation.y=Math.PI; }
+    if(r.position.x<xmin){ robotDir=1; r.rotation.y=0; }
+  }
+  $('prBatt') && cctvOn && ($('prBatt').textContent=Math.max(35,82-Math.floor(simClock/40))+'%');
+}
+
+// ---------- 데이터 레이크 (L2) ----------
+const lakeHist=[]; let lakeAcc=9;
+function lakeTick(d){
+  lakeAcc+=d; if(lakeAcc<0.6) return; lakeAcc=0;
+  const head=Math.max(sim.sea-sim.lake,0), rev=Math.max(sim.lake-sim.sea,0);
+  const flow=(sim.state==='GEN'? turbFlow(head)*Math.max(0,P.nTurb-P.nOff):0)+(sim.state==='SLUICE'? gateFlow(rev)*P.nGate:0);
+  const rate=Math.round(1180+flow*0.12+40*Math.sin(sim.t*3.1)+(Math.sin(sim.t*17)*18));
+  $('lkTag').textContent=rate.toLocaleString();
+  $('lkDb').textContent=(2.41+sim.totalMWh*0.00001).toFixed(2)+' TB · 99.8%';
+  $('lkDoc').textContent=(1247+Math.floor(sim.t/6)).toLocaleString()+'건';
+  $('lkVid').textContent=(86+Math.floor(sim.t/24))+'편';
+  lakeHist.push(rate); if(lakeHist.length>60) lakeHist.shift();
+  const cv=$('lakeSpark'); if(!cv) return; const g=cv.getContext('2d');
+  g.clearRect(0,0,cv.width,cv.height);
+  const mn=Math.min(...lakeHist)-30, mx=Math.max(...lakeHist)+30;
+  g.beginPath();
+  lakeHist.forEach((v,i)=>{ const x=i/(59)*cv.width, y=cv.height-6-(v-mn)/(mx-mn)*(cv.height-14);
+    i?g.lineTo(x,y):g.moveTo(x,y); });
+  g.strokeStyle='#00B9ED'; g.lineWidth=2.4; g.stroke();
+  g.lineTo(cv.width,cv.height); g.lineTo(0,cv.height); g.closePath();
+  const gr=g.createLinearGradient(0,0,0,cv.height);
+  gr.addColorStop(0,'rgba(0,185,237,0.30)'); gr.addColorStop(1,'rgba(0,185,237,0.02)');
+  g.fillStyle=gr; g.fill();
+}
+
+// ---------- VTS 가상훈련 — 분해점검 타임라인 (PPT Scene③) ----------
+const VTS_STEPS=[
+ ['준비·인터록','Standstill 확인 · 작업허가 · T7 격리 (9기 운전)', 0, 5],
+ ['해치 개방','발전동 지붕 개구부 개방 · 크레인 결속', 5, 10],
+ ['러너 인양','510 ton 인양 — 하중·수직도 모니터링', 10, 18],
+ ['운반','정비 베이 이송 — 선회 반경 통제', 18, 26],
+ ['분해','블레이드 4장 분리 · 노즈콘 개방', 26, 34],
+ ['베어링 교체','가이드베어링 인출 → 신품 장착', 34, 41],
+ ['재조립','블레이드 체결 · 토크 검증', 41, 48],
+ ['복귀·재설치','러너 재인양 → 원위치 안착 · 해치 폐쇄', 48, 56],
+ ['시운전·평가','Standstill→Turbine→Line→Reverse · 절차 평가', 56, 62],
+];
+$('vtsSteps').innerHTML=VTS_STEPS.map((s,i)=>
+  `<li id="vs${i}"><i></i><div><b>${String(i+1).padStart(2,'0')} ${s[0]}</b><span>${s[1]}</span></div></li>`).join('');
+let vtsOn=false, vtsT=0, vtsPh=-1;
+const VTS_END=VTS_STEPS[VTS_STEPS.length-1][3];
+const lerp=(a,b,t)=>a+(b-a)*Math.max(0,Math.min(1,t));
+const ease=t=>{const x=Math.max(0,Math.min(1,t));return x*x*(3-2*x);};
+function vtsRisk(html){ const el=$('vtsRisk'); if(!html){el.style.display='none';return;}
+  el.style.display='block'; el.innerHTML=html; }
+function setVTS(on){
+  vtsOn=on; vtsRig.g.visible=on;
+  lgSigns.forEach(s=>s.visible=!on);          // T7 인양 시야 확보
+  $('vts').classList.toggle('show',on);
+  if(on){
+    if(cctvOn) setCCTV(false); if(tour) setTour(false);
+    $('loop').classList.remove('show'); $('agentWin').classList.remove('show');
+    vtsT=0; vtsPh=-1; controls.enabled=false;
+    pdm.offline.add(6);                                   // T7 격리 — 9기 운전
+    $('vtsTag').textContent='훈련 중'; $('vtsEval').style.display='none'; vtsRisk(null);
+    for(let i=0;i<VTS_STEPS.length;i++){ const li=$('vs'+i); if(li) li.className=''; }
+    banner('VTS 가상훈련 개시: T7 분해점검','\'27 최초 분해점검(15년 주기) 대비 — 절차·소요시간 자동 평가','info',4600);
+    logOps('VTS','T7 분해점검 훈련 개시 — 러너 Ø7.5m · 510 ton','');
+  } else {
+    controls.enabled=true; pdm.offline.delete(6);
+    vtsRig.asm.position.set(VTS_TX,1.0,BZ); vtsRig.asm.rotation.set(0,0,0);
+    vtsRig.crane.position.set(VTS_TX,0,BZ); vtsRig.hook.position.set(0,deckY+11,0);
+    vtsRig.hatch.position.set(VTS_TX,deckY+7.75,BZ);
+    vtsRig.blades.forEach(b=>{ b.arm.rotation.x=b.home.rx; b.arm.position.set(b.home.px,0,0);
+      b.arm.rotation.z=0; });
+    vtsRig.oldBr.position.set(-1.55,0,0); vtsRig.oldBr.visible=true; vtsRig.newBr.visible=false;
+    applyView(0,true);
+  }
+}
+$('bVTS').onclick=()=>setVTS(!vtsOn);
+$('vtsExit').onclick=()=>setVTS(false);
+function vtsCam(ph,k){
+  const trk=ph===3?lerp(VTS_TX,VTS_BAY,k):ph===7?lerp(VTS_BAY,VTS_TX,k):0;
+  const P={
+    0:[[VTS_TX+34,deckY+20,BZ+30],[VTS_TX,deckY+5,BZ]],
+    1:[[VTS_TX+30,deckY+22,BZ+28],[VTS_TX,deckY+8,BZ]],
+    2:[[VTS_TX+32,deckY+22,BZ+30],[VTS_TX,deckY+10,BZ]],
+    3:[[trk+10,deckY+26,BZ+36],[trk,deckY+9,BZ]],
+    4:[[VTS_BAY-20,deckY+16,BZ+24],[VTS_BAY,deckY+3,BZ]],
+    5:[[VTS_BAY-11,deckY+9,BZ+13],[VTS_BAY-1.5,deckY+2.8,BZ]],
+    6:[[VTS_BAY-20,deckY+16,BZ+24],[VTS_BAY,deckY+3,BZ]],
+    7:[[trk+10,deckY+26,BZ+36],[trk,deckY+7,BZ]],
+    8:[[VTS_TX+34,deckY+16,BZ+28],[VTS_TX,deckY+3,BZ]],
+  }[ph]||[[VTS_TX+34,deckY+20,BZ+30],[VTS_TX,deckY+5,BZ]];
+  camera.position.lerp(new THREE.Vector3(...P[0]),0.12);
+  controls.target.lerp(new THREE.Vector3(...P[1]),0.15);
+  camera.lookAt(controls.target);
+}
+function vtsTick(d){
+  if(!vtsOn) return;
+  vtsT=Math.min(vtsT+d,VTS_END);
+  const mm=Math.floor(vtsT/60), ss=Math.floor(vtsT%60);
+  $('vtsClock').textContent=String(mm).padStart(2,'0')+':'+String(ss).padStart(2,'0');
+  $('vtsWork').textContent=(vtsT/VTS_END*3.7).toFixed(1)+' h';
+  let ph=VTS_STEPS.findIndex(s=>vtsT>=s[2]&&vtsT<s[3]); if(ph<0) ph=VTS_STEPS.length-1;
+  const [_,__,t0,t1]=VTS_STEPS[ph]; const k=ease((vtsT-t0)/(t1-t0));
+  if(ph!==vtsPh){
+    vtsPh=ph;
+    VTS_STEPS.forEach((s,i)=>{ const li=$('vs'+i); if(li) li.className=i<ph?'done':i===ph?'run':''; });
+    if(ph===2) vtsRisk('<b>위험 인지</b> — 중량물 510 ton 인양: 하부 출입 통제 · 와이어 수직도 ±2° 이내 유지');
+    else if(ph===3) vtsRisk('<b>위험 인지</b> — 크레인 선회 반경 내 접근 금지 · 신호수 배치 확인');
+    else if(ph===5) vtsRisk('<b>점검 포인트</b> — 가이드베어링 마모율 측정: 0.42㎜ (교체 기준 0.35㎜ 초과) → 신품 교체');
+    else if(ph===8){ vtsRisk(null);
+      $('vtsEval').style.display='block';
+      $('vtsEval').innerHTML='<div class="ehead">훈련 평가 — 자동 채점</div>'
+        +'<div class="erow"><span>절차 준수 (9단계)</span><b>100%</b></div>'
+        +'<div class="erow"><span>위험 인지 응답</span><b>3/3</b></div>'
+        +'<div class="erow"><span>환산 작업시간</span><b>3.7 h (기준 4.0 h)</b></div>'
+        +'<div class="erow"><span>숙련 기간 효과</span><b>20일 → 8일 (▽60%)</b></div>';
+      $('vtsTag').textContent='평가 완료';
+      logOps('VTS','분해점검 훈련 완료 — 절차 준수 100% · 시퀀스 인터록 PASS','good');
+      banner('VTS 훈련 완료: 절차 준수 100%','Standstill→Turbine→Line→Reverse 재기동 PASS · 숙련 20일→8일','ok',5200);
+    } else vtsRisk(null);
+  }
+  const R=vtsRig, asm=R.asm, crane=R.crane, hook=R.hook;
+  if(ph===1){ R.hatch.position.z=BZ+11*k; R.hatch.position.y=deckY+7.75+1.2*Math.sin(k*Math.PI); }
+  if(ph===2){ asm.position.y=lerp(1.0,deckY+11,k); asm.position.x=VTS_TX; crane.position.x=VTS_TX; }
+  if(ph===3){ const x=lerp(VTS_TX,VTS_BAY,k); asm.position.x=x; crane.position.x=x; asm.position.y=deckY+11-(k>0.85?ease((k-0.85)/0.15)*8.6:0); }
+  if(ph===4){ asm.position.set(VTS_BAY,deckY+2.4,BZ); crane.position.x=VTS_BAY;
+    R.blades.forEach((b,i)=>{ const bk=ease(k*4-i); if(bk>0){
+      b.arm.position.x=b.home.px+bk*3.2; b.arm.position.z=(i-1.5)*3.4*bk;
+      b.arm.position.y=-bk*0.9; }});
+    R.nose.position.x=-3.3-2.8*ease(k*1.4);
+  }
+  if(ph===5){ R.oldBr.material.emissiveIntensity=0.9*(1-k);
+    R.oldBr.position.z=6.5*ease(k*1.6); R.oldBr.position.y=-0.5*ease(k*1.6);
+    if(k>0.5){ R.newBr.visible=true;
+      R.newBr.position.set(VTS_BAY-1.55,deckY+2.4-0.5*(1-ease((k-0.5)*2)),BZ-6.5*(1-ease((k-0.5)*2))); }
+  }
+  if(ph===6){ R.oldBr.visible=false;
+    if(R.newBr.visible){ R.newBr.position.set(VTS_BAY-1.55,deckY+2.4,BZ); }
+    R.blades.forEach((b,i)=>{ const bk=1-ease(k*4-i);
+      b.arm.position.x=b.home.px+bk*3.2; b.arm.position.z=(i-1.5)*3.4*bk; b.arm.position.y=-bk*0.9; });
+    R.nose.position.x=-3.3-2.8*(1-ease(k*1.4));
+  }
+  if(ph===7){ R.newBr.visible=false;
+    const up=k<0.25?ease(k/0.25):1, mv=ease((k-0.25)/0.5), dn=k>0.78?ease((k-0.78)/0.22):0;
+    const x=lerp(VTS_BAY,VTS_TX,mv);
+    asm.position.set(x, lerp(deckY+2.4,deckY+11,up)-(deckY+10)*dn, BZ);
+    if(dn>0) asm.position.y=lerp(deckY+11,1.0,dn);
+    crane.position.x=x;
+    R.hatch.position.z=BZ+11*(1-(k>0.9?ease((k-0.9)/0.1):0));
+  }
+  if(ph===8){ R.hatch.position.set(VTS_TX,deckY+7.75,BZ); }
+  if(ph>=2&&ph<=7){
+    hook.position.x=asm.position.x-crane.position.x;
+    hook.position.y=asm.position.y+2.4;
+    const beamY=deckY+15.5, len=Math.max(0.5,beamY-1.2-hook.position.y);
+    R.cable.scale.y=len; R.cable.position.set(hook.position.x,beamY-1.2-len/2,0);
+  }
+  vtsCam(ph,k);
+}
+
+let _wallPrev=0;
+function opsTick(dt){
+  // 연출 클록: 대화형=벽시계(저프레임에서도 실시간 진행) / REC=프레임 dt(결정론)
+  let d=dt;
+  if(!REC){ const w=performance.now()/1000;
+            d=_wallPrev? Math.min(w-_wallPrev,1) : 0; _wallPrev=w; }
+  simClock+=d;
+  pumpTimers();
+  P.nOff=0; pdm.offline.forEach(i=>{ if(i<P.nTurb) P.nOff++; });   // 물리·HUD·3D 단일 기준
+  dosTick(d); stripTick(); robotTick(d); cctvTick(d); lakeTick(d); vtsTick(d);
 }
 
 // ====================================================================
@@ -847,8 +1843,9 @@ function frame(nowSec, dtReal){
   if(rt.playing){ const dtHr=dtReal*rt.speed/3600; integrate(sim,P,dtHr); }
   animateScene(nowSec, dtReal);
   if(tour){ updateTour(dtReal); camera.lookAt(controls.target); }
-  else { updateCamera(dtReal); controls.update(); }
+  else if(!vtsOn){ updateCamera(dtReal); controls.update(); }   // VTS 중엔 전용 카메라가 제어
   updateHUD();
+  opsTick(dtReal);
   renderer.render(scene,camera);
 }
 let prev=performance.now();
@@ -859,17 +1856,23 @@ function animateScene(t, dt){
   const head=Math.max(sim.sea-sim.lake,0);
   const rev=Math.max(sim.lake-sim.sea,0);
   const spin=sim.state==='GEN'?(0.5+head*0.22):0;
-  const nOn=sim.state==='GEN'?P.nTurb:0;
-  // --- 터빈: 러너·흡입 팬 회전 + 발광 림 + 유량 비례 통수 ---
+  const nOnBase=sim.state==='GEN'?P.nTurb:0;
+  // --- 터빈: 러너·팬 회전 + 발광 림 + 상태별 색 (경보=적색 점멸 / 정비격리=회색) ---
   turbines.forEach((tb,i)=>{
-    tb.on=i<nOn;
+    const off=pdm.offline.has(i), alarm=pdm.alarm.has(i);
+    tb.on=!off && i<nOnBase;
     if(tb.on){ tb.runner.rotation.z+=spin; tb.fan.rotation.z+=spin; }
     const target=tb.on?0.95:0;
     tb.flow.material.opacity+=(target-tb.flow.material.opacity)*0.12;
     tb.flow.material.size=0.7+head*0.13;
-    tb.glow.material.emissiveIntensity+=((tb.on?0.7+0.3*Math.sin(t*6+i):0)-tb.glow.material.emissiveIntensity)*0.1;
+    const g=tb.glow.material;
+    if(alarm){ g.color.set(0xE03131); g.emissive.set(0xE03131); g.emissiveIntensity=0.9+0.8*Math.abs(Math.sin(t*7)); }
+    else if(off){ g.color.set(0x9aa4b2); g.emissive.set(0x9aa4b2); g.emissiveIntensity=0.3; }
+    else { g.color.set(0xffd34d); g.emissive.set(0xffb020);
+      g.emissiveIntensity+=((tb.on?0.7+0.3*Math.sin(t*6+i):0)-g.emissiveIntensity)*0.1; }
     if(tb.on) advect(tb.flow,+1,0.7+head*0.3);
   });
+  const nOn=turbines.reduce((a,tb)=>a+(tb.on?1:0),0);
   // --- 수문: 게이트 상하 + 유량 비례 배수 ---
   gates.forEach((g,i)=>{
     g.open=(sim.state==='SLUICE')&&i<P.nGate;
@@ -892,7 +1895,7 @@ function animateScene(t, dt){
     x:gateX0+GATE_SPAN/2,y:Math.max(sim.sea,1)+0.2,z:-BARRIER_W/2-1.5,spread:GATE_SPAN*0.55,up:3.4,dz:-2.8});
   // --- 실시간 라벨(낙차·통수량·출력) ---
   if(t-lbl.last>0.12){
-    const st=({WAIT:'① 낙차 축적',GEN:'② 발전 중',WAIT_HIGH:'③ 만조 정체',SLUICE:'④ 배수 중'})[sim.state]||'';
+    const st=({WAIT:'낙차 축적',GEN:'발전 중',WAIT_HIGH:'만조 정체',SLUICE:'배수 중'})[sim.state]||'';
     drawLabel(head, Math.round(qIn||qOut), sim.power, st);
     lbl.last=t;
   }
@@ -920,10 +1923,10 @@ function updateCamera(dt){
   controls.target.lerp(camTarget,0.06);
 }
 const stateInfo={
-  WAIT:{t:'① 낙차 축적 (수문 닫힘)',c:'rgba(117,117,117,0.35)'},
-  GEN:{t:'② 발전 중 — 바다→호소 통수',c:'rgba(45,106,45,0.55)'},
-  WAIT_HIGH:{t:'③ 만조 정체 (발전 종료)',c:'rgba(166,4,55,0.40)'},
-  SLUICE:{t:'④ 배수 중 — 수문 개방',c:'rgba(14,124,123,0.55)'},
+  WAIT:{t:'단계 1/4 · 낙차 축적 (수문 닫힘)',c:'rgba(117,117,117,0.35)'},
+  GEN:{t:'단계 2/4 · 발전 중 · 바다→호소',c:'rgba(45,106,45,0.55)'},
+  WAIT_HIGH:{t:'단계 3/4 · 만조 정체 (발전 종료)',c:'rgba(0,85,150,0.45)'},
+  SLUICE:{t:'단계 4/4 · 배수 중 (수문 개방)',c:'rgba(0,127,176,0.55)'},
 };
 function updateHUD(){
   const head=sim.sea-sim.lake;
@@ -932,14 +1935,17 @@ function updateHUD(){
   $('seaLv').textContent=sim.sea.toFixed(2);
   $('lakeLv').textContent=sim.lake.toFixed(2);
   $('head').textContent=head.toFixed(2);
-  $('nturb').textContent=(sim.state==='GEN'?P.nTurb:0);
+  $('nturb').textContent=(sim.state==='GEN'?Math.max(0,P.nTurb-(P.nOff||0)):0);
   const days=Math.floor(sim.t/24), hrs=Math.floor(sim.t%24), mm=Math.floor((sim.t*60)%60);
   $('elapsed').textContent=`${days}일 ${String(hrs).padStart(2,'0')}시간 ${String(mm).padStart(2,'0')}분`;
   $('totMWh').textContent=sim.totalMWh>=1000
     ? (sim.totalMWh/1000).toFixed(2)+' GWh' : Math.round(sim.totalMWh).toLocaleString()+' MWh';
   const s=stateInfo[sim.state]||stateInfo.WAIT;
   $('state').textContent=s.t; $('state').style.background=s.c;
-  const cyc=sim.lastCycle;
+  const inProg=!(sim.lastCycle>0);
+  const cyc=inProg?sim.cycE:sim.lastCycle;
+  $('perfTitle').textContent=inProg?'발전 실적 (첫 주기 진행 중)':'발전 실적 (직전 주기 기준)';
+  /* keep */
   $('cCycle').textContent=cyc.toFixed(0);
   const day=cyc*1.932; $('cDay').textContent=(day/1000).toFixed(2);
   const year=day*365/1000; $('cYear').textContent=year.toFixed(0);
@@ -962,7 +1968,12 @@ if(REC){
     reset:()=>{ sim=freshState(); rt0=0; },
     reflector:b=>{ lakeReflector.visible=b; },
     scenario:(title,sub)=>{ const e=$('scenario'); if(!title){ e.style.display='none'; return; }
-      e.innerHTML=title+(sub?('<small>'+sub+'</small>'):''); e.style.display='block'; } };
+      e.className='hud info'; e.innerHTML=title+(sub?('<small>'+sub+'</small>'):''); e.style.display='block'; },
+    fault:()=>injectFault(), approve:()=>approve(true),
+    cctv:b=>setCCTV(b), agent:k=>openAgent(k||'ops'), agentClose:()=>$('agentWin').classList.remove('show'),
+    vts:b=>setVTS(b!==false),
+    vc:()=>$('bVC').click(), viol:()=>$('bViol').click(),
+    sweep:()=>{ $('bSweep').click(); }, apply:()=>{ $('bApply').click(); } };
 } else {
   requestAnimationFrame(tick);
 }
