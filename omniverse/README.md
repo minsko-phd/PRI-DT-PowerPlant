@@ -11,20 +11,30 @@ WebGL(Three.js) 데모(이 저장소의 `index.html`)를 **NVIDIA Omniverse / Op
 - [배수 — 호소→바다 방류](../media/sihwa_omniverse_sluice.mp4)
 - 정적 렌더: [서해측 전면](../media/sihwa_omniverse_render.png) · [탑다운(배치검증)](../media/sihwa_omniverse_topview.png)
 
-## CAD 원본 다운로드
+## 다른 PC에서 열기 (요약)
 실 CAD(`Layout.usd` 112MB 등)는 GitHub 100MB 제한 때문에 원본 그대로는 올릴 수 없어,
 **[`cad_source/Sihwa_USD_Package.zip`](cad_source/Sihwa_USD_Package.zip)** (59MB, 압축)에 담았습니다.
-압축 해제 후 `siwha_env.py`의 `LAYOUT` 경로를 실제 위치로 수정하면 됩니다 — zip 안의
-`SETUP_README.txt` 참고.
+`siwha_env.py`는 **자기 파일 위치를 기준으로 `Layout.usd`를 자동으로 찾으므로**, 압축만 풀면
+경로 수정 없이 바로 동작합니다. 상세한 단계별 설치 가이드(kit-app-template 빌드부터)는
+zip 안의 **`SETUP_README.txt`**를 참고하세요. 요약:
 
-## 실행
 ```powershell
+# 1) USD Composer 앱 빌드 (최초 1회)
+git clone https://github.com/NVIDIA-Omniverse/kit-app-template.git
+cd kit-app-template
+$env:PYTHONUTF8 = "1"                 # 한국어(cp949) Windows 필수
+.\repo.bat template new               # Application → USD Composer 선택, 나머지 기본값
+.\repo.bat build
+
+# 2) 이 zip을 아무 폴더에나 압축 해제
+
+# 3) 실행
 $env:PYTHONUTF8 = "1"
-$rel = "<kit-app-template 빌드 경로>\_build\windows-x86_64\release"
-& "$rel\kit\kit.exe" "$rel\apps\<생성한 앱>.kit" --exec "<경로>\siwha_env.py"
+$rel = "<1단계 경로>\_build\windows-x86_64\release"
+& "$rel\kit\kit.exe" "$rel\apps\<1단계에서 만든 이름>.kit" --exec "<2단계 경로>\siwha_env.py"
 ```
-kit-app-template 빌드 방법은 [NVIDIA-Omniverse/kit-app-template](https://github.com/NVIDIA-Omniverse/kit-app-template) 참고.
-Windows 한국어 로케일(cp949)에서는 `repo.bat` 실행 전 `$env:PYTHONUTF8 = "1"`이 필수입니다.
+준비물: Windows 10/11 · NVIDIA RTX GPU(드라이버 ≥551.78) · Git · 인터넷(빌드 시 + **실행 중**에도
+필요 — 하늘/수목/바위를 NVIDIA 콘텐츠 서버에서 실시간으로 불러옵니다). Visual Studio 불필요.
 
 ## 구성 파일
 | 파일 | 내용 |

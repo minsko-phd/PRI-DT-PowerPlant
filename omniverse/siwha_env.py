@@ -1,11 +1,13 @@
 # -*- coding: utf-8 -*-
 # 시화 조력발전소 — 실 CAD(Layout.usd) + 실제 환경(방조제·301호선 도로·바다/호소·시화나래 전망대)
 # 좌표: Y-up, 미터. X=방조제 방향, Z=횡단(바다 -Z=서해 / 호소 +Z=시화호), Y=높이.
-import asyncio, carb, math
+import asyncio, carb, math, os
 import omni.usd, omni.kit.app
 from pxr import Usd, UsdGeom, UsdShade, UsdLux, Sdf, Gf, Vt
 
-LAYOUT = r"C:\Users\user\AIWorkspace\siwha_usd\Layout.usd"
+# 이 스크립트와 같은 폴더를 기준으로 CAD/출력 경로를 자동 결정 — 다른 PC로 옮겨도 수정 불필요.
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+LAYOUT = os.path.join(BASE_DIR, "Layout.usd")
 _G = {}
 
 # ---- 튜닝 상수 ----
@@ -357,7 +359,7 @@ async def _go():
 
     carb.log_warn("[ENV] built prims=%d"%len(list(st.Traverse())))
     try:
-        st.Export(r"C:\Users\user\AIWorkspace\siwha_usd\SihwaPlant_Env.usd"); carb.log_warn("[ENV] exported")
+        st.Export(os.path.join(BASE_DIR, "SihwaPlant_Env.usd")); carb.log_warn("[ENV] exported")
     except Exception as e: carb.log_warn("[ENV] export skip %s"%e)
 
     # --- 카메라 프레이밍(전체) ---
@@ -462,7 +464,7 @@ async def _go():
             import omni.kit.viewport.utility as vpu2
             vp2=vpu2.get_active_viewport()
             for _ in range(500): await app.next_update_async()          # 에셋 로딩+상태 안정
-            seq=r"C:\Users\user\AIWorkspace\siwha_usd\frames_"+vmode
+            seq=os.path.join(BASE_DIR, "frames_"+vmode)
             _os.makedirs(seq,exist_ok=True)
             for i in range(450):
                 vpu2.capture_viewport_to_file(vp2, seq+("\\f_%04d.png"%i))
@@ -478,12 +480,12 @@ async def _go():
         vp=vpu.get_active_viewport()
         if vmode: raise RuntimeError("video mode - skip stills")
         for _ in range(650): await app.next_update_async()   # 네트워크 에셋 로딩 대기
-        vpu.capture_viewport_to_file(vp, r"C:\Users\user\AIWorkspace\siwha_usd\SihwaPlant_render.png")
+        vpu.capture_viewport_to_file(vp, os.path.join(BASE_DIR, "SihwaPlant_render.png"))
         for _ in range(150): await app.next_update_async()
         v2=Gf.Matrix4d(); v2.SetLookAt(Gf.Vec3d(-60,1000,2),Gf.Vec3d(-60,20,0),Gf.Vec3d(0,0,-1))
         _G['camOp'].Set(v2.GetInverse())
         for _ in range(200): await app.next_update_async()
-        vpu.capture_viewport_to_file(vp, r"C:\Users\user\AIWorkspace\siwha_usd\SihwaPlant_top.png")
+        vpu.capture_viewport_to_file(vp, os.path.join(BASE_DIR, "SihwaPlant_top.png"))
         for _ in range(120): await app.next_update_async()
         carb.log_warn("[ENV] RENDER_CAPTURED")
     except Exception as ex:
