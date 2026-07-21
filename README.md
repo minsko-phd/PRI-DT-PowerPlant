@@ -139,3 +139,14 @@ DOS 통합 관제 · 예지보전 · AI Agent 8단계 자율 루프(HITL·트윈
 VTS 수차 분해점검 가상훈련(실물 CAD 기반 벌브 수차 인양→분해→베어링 교체→평가) ·
 프로페셔널 HMI GUI(K-water CI · ISA-18.2 알람 · LG 공식 심볼) · 폐쇄망 완전 대응.
 상세: `docs/DEMO-GUIDE.md`
+
+---
+
+## Omniverse(RTX) 구현 (2026-07-21)
+
+이 WebGL 데모의 그래픽·물리를 **NVIDIA Omniverse / OpenUSD + RTX**로 재구현한 버전.
+절차적 모델링이 아닌 **실 CAD를 히어로**로 참조하고, 실사·구글맵 대조 검증을 거쳐 배치를 교정했습니다.
+
+- 상세 문서·CAD 소스·실행법: [`omniverse/README.md`](omniverse/README.md)
+- 데모 영상: [발전(통수)](media/sihwa_omniverse_gen.mp4) · [배수(방류)](media/sihwa_omniverse_sluice.mp4)
+- 정적 렌더: [서해측 전면](media/sihwa_omniverse_render.png) · [탑다운](media/sihwa_omniverse_topview.png)
